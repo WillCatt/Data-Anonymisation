@@ -26,7 +26,7 @@ I structured this as a project a firm could plausibly commission, in three phase
 |---|---|---|
 | **1 — Proof of concept** | How big is the off-the-shelf gap? Can we measure where it leaks? Is the residual *mosaic* risk something the buyer needs to worry about? | ✅ Built |
 | **2 — Baseline comparison + fine-tune** | How much of the gap closes if we compare alternative models, and if we fine-tune on legal data? | 🟡 Code complete, runs pending |
-| **3 — Production pipeline** | What does the actual deployable thing look like? NER + regex post-pass + mosaic-risk scorer + audit log + human-in-the-loop fallback. | 📋 Scoped |
+| **3 — Production pipeline** | What does the actual deployable thing look like? Two-variant package (Lite vs Pro) + CLI + Gradio demo. | ✅ Built (demo deploy pending) |
 
 This writeup focuses on Phase 1 — what's built, what it found, what it implies. Phase 2 and 3 are scoped in `phase2_baseline_comparison/README.md` and `phase3_pipeline/README.md` in the repo.
 
@@ -122,6 +122,50 @@ Two questions that explicitly stay out of scope:
 
 - **No model selection sweep.** I picked `roberta-base` and `dslim/bert-base-NER` based on common defaults, not on a prior search. If the fine-tune is borderline, `roberta-large` or a legal-domain BERT (LegalBERT, CaseLawBERT) would be the obvious next try.
 - **No active learning loop.** A real production deployment would feed paralegal corrections back into the training set. That's a Phase-3-and-beyond conversation.
+
+---
+
+## Phase 3 — A pipeline a firm could actually use
+
+The first two phases measure the problem and close most of it. Phase 3 wraps the result in something deployable. The headline design choice is that there are **two variants**, not one:
+
+- **Pipeline Lite** — DIRECT-only redaction. Fast, simple, predictable. Right tool when the threat model is "an LLM provider could log our prompts" or "a curious vendor employee could see this". The Lite pipeline strips names, organisations, case file numbers, and structured identifiers (regex-detected) and leaves QUASI mentions intact.
+- **Pipeline Pro** — DIRECT redaction *plus* mosaic-aware QUASI generalization. Right tool when the threat model is "a determined adversary could combine quasi-identifiers to re-identify the document". This is where the iterate-until-safe loop lives.
+
+Both pipelines produce the same shape of `RedactionResult` — redacted text, a per-decision audit log, the spans they touched. Pro additionally surfaces an initial and final k-anonymity score plus the number of generalization iterations it ran. A firm can A/B them on the same matter notes and pick a default per matter type.
+
+### How Pro's iterate-until-safe loop works
+
+Pseudocode of the algorithm in `src/anonymisation/pipeline/pro.py`:
+
+> 1. Detect every span (NER + regex post-pass), classify each as DIRECT or QUASI.
+> 2. Suppress every DIRECT span with `[TAB_TYPE]`.
+> 3. Build the residual QUASI fingerprint, ask the `MosaicScorer` for *k*.
+> 4. If *k* ≥ k_target, stop.
+> 5. Otherwise, advance every QUASI span one generalization level deeper (e.g. `47-year-old` → `about 50` → `in their 40s` → `[QUANTITY]`; `Plovdiv` → `Bulgaria` → `Europe` → `[LOC]`). Recompute *k*.
+> 6. Repeat up to `max_iterations`. If the loop runs out of room without reaching k_target, suppress everything that's left.
+
+The generalization rules are deliberately small — taxonomy lookups for cities → countries, year/decade extraction for dates, broadening tables for nationality/ethnicity/occupation. The point is to demonstrate the *shape* of the algorithm, not to solve real-world generalization (which is a domain-knowledge problem in its own right). A production deployment would replace each ruleset with proper taxonomy data or LLM-driven rewrites.
+
+### The mosaic haystack — methodological caveat
+
+The mosaic scorer compares each document's QUASI fingerprint against a haystack of known fingerprints. In our demo the haystack is TAB itself — 1,268 ECHR cases. In production it should be the firm's own matter database. The TAB-as-haystack choice is a methodological stand-in: a fingerprint that is unique within TAB is at least *plausibly* unique in the firm's corpus, which is the question the buyer cares about. The writeup is explicit about this so a reader doesn't conflate the demo's setup with what a deployment would actually look like.
+
+### Surface area
+
+- **Importable library** — `from anonymisation.pipeline import LitePipeline, ProPipeline`. Either pipeline accepts any of the predictors built in Phases 1 and 2 (spaCy, HuggingFace, Presidio, fine-tuned).
+- **CLI** — `python -m anonymisation.cli redact --variant {lite|pro} input.txt`. Useful for ad-hoc redaction and for piping into batch jobs.
+- **Walkthrough notebooks** — `phase3_pipeline/notebooks/{01_lite,02_pro,03_lite_vs_pro}.ipynb`. Same code path as the library, with narrative around it.
+- **Gradio demo** — `demo/app.py`. Side-by-side Lite vs Pro UI with audit log tab and pre-canned examples; intended to deploy to HuggingFace Spaces and embed in this writeup as an iframe.
+
+### What Phase 3 does NOT do
+
+Out of scope, deliberately, and called out in the audit so a reader knows:
+
+- **Document layout** — letterheads, page footers, recurring docket numbers per page. The pipeline is text-in, text-out; layout-aware extraction is a separate piece of plumbing.
+- **PDF / DOCX extraction** — the test inputs are plain text. A real deployment would prepend a `pdfplumber` / `python-docx` step.
+- **Active learning / human-in-the-loop UI** — the audit log makes this *possible* (a paralegal can review every decision and correct mistakes), but the workflow tooling around that audit isn't built.
+- **Network-isolated deployment** — the pipeline is pure Python with no external API calls, so it can run on-prem in principle, but a real Docker / Kubernetes packaging hasn't been done.
 
 ---
 

@@ -1,0 +1,12 @@
+# Demo-only requirements for HuggingFace Spaces deployment.
+# (Locally, this is already covered by the repo's top-level requirements.txt.)
+#
+# Gradio is pinned to 4.x — versions 5+ removed `show_copy_button` and moved
+# `theme=` from Blocks() to launch(). The app handles those changes gracefully
+# at runtime, but pinning here keeps installs reproducible.
+gradio>=4.20.0,<5.0.0
+typer>=0.3.0,<0.10.0           # spacy 3.7.x compatibility
+spacy==3.7.4
+datasets==2.18.0
+pandas>=2.0.0
+huggingface-hub>=0.20.0

@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Legal Text Anonymisation — Lite vs Pro</title>
+  <style>
+:root {
+  --bg: #fafbfc;
+  --panel: #ffffff;
+  --border: #e1e4e8;
+  --text: #24292e;
+  --muted: #586069;
+  --accent: #0366d6;
+  --green: #2ea44f;
+  --amber: #e36209;
+  --red:   #d73a49;
+  --code-bg: #f6f8fa;
+  --tag-bg: #fff5b1;
+  --tag-text: #735c0f;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  margin: 0; padding: 2rem 1rem;
+  line-height: 1.5;
+}
+.container { max-width: 1100px; margin: 0 auto; }
+header { margin-bottom: 2rem; }
+header h1 { margin: 0 0 0.5rem; font-size: 1.6rem; }
+header p { color: var(--muted); margin: 0.25rem 0; }
+.tag-row { margin: 0.75rem 0 0; }
+.tag { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 1rem;
+       background: #eaf5ff; color: var(--accent); font-size: 0.8rem; margin-right: 0.5rem; }
+
+.tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem; }
+.tabs label {
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+.tabs input[type=radio] { display: none; }
+.tabs label:hover { color: var(--text); }
+.panel { display: none; }
+
+/* CSS-only tab switching */
+#tab1:checked ~ .tabs label[for=tab1],
+#tab2:checked ~ .tabs label[for=tab2],
+#tab3:checked ~ .tabs label[for=tab3] {
+  background: var(--panel); color: var(--text);
+  border-color: var(--border); border-bottom-color: var(--panel);
+  margin-bottom: -1px;
+}
+#tab1:checked ~ .panels #panel1,
+#tab2:checked ~ .panels #panel2,
+#tab3:checked ~ .panels #panel3 { display: block; }
+
+.sample-blurb {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+  padding: 0.75rem 1rem; color: var(--muted); margin-bottom: 1rem; font-size: 0.95rem;
+}
+.cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+@media (max-width: 800px) { .cols { grid-template-columns: 1fr; } }
+.col {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+  padding: 1rem; min-height: 200px;
+}
+.col h3 { margin: 0 0 0.5rem; font-size: 1rem; }
+.col h3 .badge {
+  display: inline-block; font-size: 0.7rem; padding: 0.1rem 0.45rem;
+  border-radius: 3px; background: #f1f8ff; color: var(--accent);
+  margin-left: 0.5rem; vertical-align: middle;
+}
+.col h3 .badge.pro { background: #e6ffed; color: var(--green); }
+.col h3 .badge.lite { background: #fff5b1; color: var(--tag-text); }
+.col .body { white-space: pre-wrap; font-size: 0.9rem; line-height: 1.55; }
+.col .body .tag {
+  background: var(--tag-bg); color: var(--tag-text);
+  padding: 0 0.25rem; border-radius: 3px; font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.85em;
+}
+.mosaic {
+  margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed var(--border);
+  font-size: 0.85rem; color: var(--muted);
+}
+.mosaic .k {
+  display: inline-block; padding: 0.1rem 0.45rem; border-radius: 3px;
+  font-family: ui-monospace, SFMono-Regular, monospace; font-weight: 600;
+  background: var(--code-bg); color: var(--text);
+}
+.mosaic .converged { color: var(--green); }
+.mosaic .unconverged { color: var(--red); }
+
+details {
+  margin-top: 1.5rem; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 6px; padding: 0.5rem 1rem;
+}
+details summary {
+  cursor: pointer; font-size: 0.9rem; color: var(--muted); padding: 0.5rem 0;
+}
+details[open] summary { color: var(--text); border-bottom: 1px solid var(--border);
+                        margin-bottom: 0.75rem; padding-bottom: 0.75rem; }
+.audit-table {
+  width: 100%; border-collapse: collapse; font-size: 0.82rem;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+.audit-table th, .audit-table td {
+  text-align: left; padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.audit-table th { background: var(--code-bg); color: var(--muted); font-weight: 600; }
+.audit-table td.iter { color: var(--muted); }
+.audit-table td.action.redact     { color: var(--red); }
+.audit-table td.action.generalize { color: var(--amber); }
+.audit-table td.action.leave      { color: var(--green); }
+
+footer {
+  margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border);
+  font-size: 0.85rem; color: var(--muted);
+}
+footer p { margin: 0.5rem 0; }
+footer a { color: var(--accent); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+
+.callout {
+  background: #fffbea; border-left: 3px solid var(--amber);
+  padding: 0.75rem 1rem; margin: 1rem 0; font-size: 0.9rem; color: #735c0f;
+  border-radius: 0 4px 4px 0;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Legal Text Anonymisation — Lite vs Pro</h1>
+    <p>Two redaction pipelines, side by side, on three illustrative legal-style inputs.</p>
+    <div class="tag-row">
+      <span class="tag">Lite — DIRECT-only</span>
+      <span class="tag">Pro — DIRECT + mosaic-aware QUASI</span>
+    </div>
+  </header>
+
+  <div class="callout">
+    <strong>About this showcase.</strong> The pipelines are the same code as
+    in <code>src/anonymisation/pipeline/</code>. Entity spans here are
+    hand-curated for deterministic output; in production they come from the
+    spaCy / RoBERTa NER from earlier phases. The mosaic scorer's haystack is
+    a small synthetic corpus engineered to drive useful convergence behavior
+    across the three samples — in deployment it would be the firm's own
+    document corpus.
+  </div>
+
+  <input type="radio" name="tab" id="tab1" checked><input type="radio" name="tab" id="tab2"><input type="radio" name="tab" id="tab3">
+  <div class="tabs"><label for="tab1">Sample 1 — demographic-heavy</label><label for="tab2">Sample 2 — corporate litigation</label><label for="tab3">Sample 3 — medical / structured ID</label></div>
+  <div class="panels">
+    
+    <div class="panel" id="panel1">
+      <div class="sample-blurb">ECHR-style application: a single individual described by name, age, nationality, ethnicity, location, occupation, and date of complaint. Lots of QUASI surface area; Pro generalizes them to a milder form.</div>
+      <div class="cols">
+        <div class="col">
+          <h3>Original</h3>
+          <div class="body">The applicant, Maria Petrova, is a 47-year-old Bulgarian national living in Plovdiv. On 12 March 2018 she filed a complaint (Application no. 12345/67) against the Sofia District Court alleging discrimination on grounds of her Roma ethnicity. Maria has been employed as a nurse since 2010 and is the mother of three children.</div>
+        </div>
+        <div class="col">
+          <h3>Lite <span class="badge lite">DIRECT-only</span></h3>
+          <div class="body">The applicant, <span class="tag">[PERSON]</span>, is a 47-year-old Bulgarian national living in Plovdiv. On 12 March 2018 she filed a complaint (<span class="tag">[CODE]</span>) against the <span class="tag">[ORG]</span> alleging discrimination on grounds of her Roma ethnicity. Maria has been employed as a nurse since 2010 and is the mother of three children.</div>
+        </div>
+        <div class="col">
+          <h3>Pro <span class="badge pro">DIRECT + mosaic-aware QUASI</span></h3>
+          <div class="body">The applicant, <span class="tag">[PERSON]</span>, is a about 40 European national living in Bulgaria. On 2018 she filed a complaint (<span class="tag">[CODE]</span>) against the <span class="tag">[ORG]</span> alleging discrimination on grounds of her ethnic minority ethnicity. Maria has been employed as a nurse since 2010 and is the mother of three children.</div>
+          <div class="mosaic">
+            <span class="k">k_initial = 1</span>
+            <span> → </span>
+            <span class="k">k_final = 6</span>
+            <span> · iterations: 1 · </span>
+            <span class="converged">✓ converged</span>
+          </div>
+        </div>
+      </div>
+      <details>
+        <summary>Pro audit log (every decision the pipeline made)</summary>
+        <table class="audit-table"><tr><th>iter</th><th>type</th><th>role</th><th>action</th><th>original</th><th>replacement</th></tr><tr><td class="iter">0</td><td>PERSON</td><td>DIRECT</td><td class="action redact">redact</td><td>Maria Petrova</td><td>→ [PERSON]</td></tr><tr><td class="iter">0</td><td>CODE</td><td>DIRECT</td><td class="action redact">redact</td><td>Application no. 12345/67</td><td>→ [CODE]</td></tr><tr><td class="iter">0</td><td>ORG</td><td>DIRECT</td><td class="action redact">redact</td><td>Sofia District Court</td><td>→ [ORG]</td></tr><tr><td class="iter">1</td><td>QUANTITY</td><td>QUASI</td><td class="action generalize">generalize</td><td>47-year-old</td><td>→ about 40</td></tr><tr><td class="iter">1</td><td>DEM</td><td>QUASI</td><td class="action generalize">generalize</td><td>Bulgarian</td><td>→ European</td></tr><tr><td class="iter">1</td><td>LOC</td><td>QUASI</td><td class="action generalize">generalize</td><td>Plovdiv</td><td>→ Bulgaria</td></tr><tr><td class="iter">1</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>12 March 2018</td><td>→ 2018</td></tr><tr><td class="iter">1</td><td>DEM</td><td>QUASI</td><td class="action generalize">generalize</td><td>Roma</td><td>→ ethnic minority</td></tr><tr><td class="iter">1</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>2010</td><td>→ 2010</td></tr></table>
+      </details>
+    </div>
+    
+    <div class="panel" id="panel2">
+      <div class="sample-blurb">Settlement agreement summary: company, person, case number, financial amount, IBAN, dates. Most of the identifying load is DIRECT — Lite and Pro produce nearly the same output here.</div>
+      <div class="cols">
+        <div class="col">
+          <h3>Original</h3>
+          <div class="body">On 4 July 2022, Acme Holdings Ltd entered into a settlement agreement with John Doe, formerly senior counsel at the firm. The agreement, filed under Case no. 4521/2022, covers the period from January 2019 to June 2022. Doe was based at the company&#x27;s Manchester office. The settlement amount of approximately £450,000 was confirmed via bank transfer to GB29 NWBK 6016 1331 9268 19.</div>
+        </div>
+        <div class="col">
+          <h3>Lite <span class="badge lite">DIRECT-only</span></h3>
+          <div class="body">On 4 July 2022, <span class="tag">[ORG]</span> entered into a settlement agreement with <span class="tag">[PERSON]</span>, formerly senior counsel at the firm. The agreement, filed under <span class="tag">[CODE]</span>, covers the period from January 2019 to June 2022. Doe was based at the company&#x27;s Manchester office. The settlement amount of approximately £450,000 was confirmed via bank transfer to <span class="tag">[CODE]</span>.</div>
+        </div>
+        <div class="col">
+          <h3>Pro <span class="badge pro">DIRECT + mosaic-aware QUASI</span></h3>
+          <div class="body">On 4 July 2022, <span class="tag">[ORG]</span> entered into a settlement agreement with <span class="tag">[PERSON]</span>, formerly senior counsel at the firm. The agreement, filed under <span class="tag">[CODE]</span>, covers the period from January 2019 to June 2022. Doe was based at the company&#x27;s Manchester office. The settlement amount of approximately £450,000 was confirmed via bank transfer to <span class="tag">[CODE]</span>.</div>
+          <div class="mosaic">
+            <span class="k">k_initial = 6</span>
+            <span> → </span>
+            <span class="k">k_final = 6</span>
+            <span> · iterations: 0 · </span>
+            <span class="converged">✓ converged</span>
+          </div>
+        </div>
+      </div>
+      <details>
+        <summary>Pro audit log (every decision the pipeline made)</summary>
+        <table class="audit-table"><tr><th>iter</th><th>type</th><th>role</th><th>action</th><th>original</th><th>replacement</th></tr><tr><td class="iter">0</td><td>ORG</td><td>DIRECT</td><td class="action redact">redact</td><td>Acme Holdings Ltd</td><td>→ [ORG]</td></tr><tr><td class="iter">0</td><td>PERSON</td><td>DIRECT</td><td class="action redact">redact</td><td>John Doe</td><td>→ [PERSON]</td></tr><tr><td class="iter">0</td><td>CODE</td><td>DIRECT</td><td class="action redact">redact</td><td>Case no. 4521/2022</td><td>→ [CODE]</td></tr><tr><td class="iter">0</td><td>CODE</td><td>DIRECT</td><td class="action redact">redact</td><td>GB29 NWBK 6016 1331 9268 19</td><td>→ [CODE]</td></tr><tr><td class="iter">0</td><td>DATETIME</td><td>QUASI</td><td class="action leave">leave</td><td>4 July 2022</td><td>→ —</td></tr><tr><td class="iter">0</td><td>DATETIME</td><td>QUASI</td><td class="action leave">leave</td><td>January 2019</td><td>→ —</td></tr><tr><td class="iter">0</td><td>DATETIME</td><td>QUASI</td><td class="action leave">leave</td><td>June 2022</td><td>→ —</td></tr><tr><td class="iter">0</td><td>LOC</td><td>QUASI</td><td class="action leave">leave</td><td>Manchester</td><td>→ —</td></tr><tr><td class="iter">0</td><td>QUANTITY</td><td>QUASI</td><td class="action leave">leave</td><td>£450,000</td><td>→ —</td></tr></table>
+      </details>
+    </div>
+    
+    <div class="panel" id="panel3">
+      <div class="sample-blurb">Tighter document with a DOB, location, occupation, sensitive medical context, and an NHS number. The regex pass catches the NHS number. Pro converges at deeper generalization because the QUASI fingerprint is otherwise quite distinctive.</div>
+      <div class="cols">
+        <div class="col">
+          <h3>Original</h3>
+          <div class="body">Sarah Khan, born 14 February 1985 in London, was diagnosed with a rare condition in 2020 and currently works as a software engineer at FinTech Co. Her medical history is held under NHS number 943 476 5919.</div>
+        </div>
+        <div class="col">
+          <h3>Lite <span class="badge lite">DIRECT-only</span></h3>
+          <div class="body"><span class="tag">[PERSON]</span>, born 14 February 1985 in London, was diagnosed with a rare condition in 2020 and currently works as a software engineer at <span class="tag">[ORG]</span>. Her medical history is held under NHS number <span class="tag">[CODE]</span>.</div>
+        </div>
+        <div class="col">
+          <h3>Pro <span class="badge pro">DIRECT + mosaic-aware QUASI</span></h3>
+          <div class="body"><span class="tag">[PERSON]</span>, born 1980s in Europe, was diagnosed with a rare condition in 2020s and currently works as a software engineer at <span class="tag">[ORG]</span>. Her medical history is held under NHS number <span class="tag">[CODE]</span>.</div>
+          <div class="mosaic">
+            <span class="k">k_initial = 1</span>
+            <span> → </span>
+            <span class="k">k_final = 6</span>
+            <span> · iterations: 2 · </span>
+            <span class="converged">✓ converged</span>
+          </div>
+        </div>
+      </div>
+      <details>
+        <summary>Pro audit log (every decision the pipeline made)</summary>
+        <table class="audit-table"><tr><th>iter</th><th>type</th><th>role</th><th>action</th><th>original</th><th>replacement</th></tr><tr><td class="iter">0</td><td>PERSON</td><td>DIRECT</td><td class="action redact">redact</td><td>Sarah Khan</td><td>→ [PERSON]</td></tr><tr><td class="iter">0</td><td>ORG</td><td>DIRECT</td><td class="action redact">redact</td><td>FinTech Co</td><td>→ [ORG]</td></tr><tr><td class="iter">0</td><td>CODE</td><td>DIRECT</td><td class="action redact">redact</td><td>943 476 5919</td><td>→ [CODE]</td></tr><tr><td class="iter">1</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>14 February 1985</td><td>→ 1980s</td></tr><tr><td class="iter">1</td><td>LOC</td><td>QUASI</td><td class="action generalize">generalize</td><td>London</td><td>→ Europe</td></tr><tr><td class="iter">1</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>2020</td><td>→ 2020s</td></tr><tr><td class="iter">2</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>14 February 1985</td><td>→ 1980s</td></tr><tr><td class="iter">2</td><td>LOC</td><td>QUASI</td><td class="action generalize">generalize</td><td>London</td><td>→ Europe</td></tr><tr><td class="iter">2</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>2020</td><td>→ 2020s</td></tr></table>
+      </details>
+    </div>
+    
+  </div>
+
+  <footer>
+    <p>Source: <a href="https://github.com/wcatt98/data-anonymisation">github.com/wcatt98/data-anonymisation</a> ·
+       Built from the Phase 3 pipelines.
+       The interactive Gradio version is on the roadmap once the dependency
+       situation calms down — see <code>demo/app.py</code>.</p>
+  </footer>
+</div>
+</body>
+</html>

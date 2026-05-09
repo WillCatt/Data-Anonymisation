@@ -4,7 +4,8 @@
 
 [![Phase 1](https://img.shields.io/badge/Phase_1-Proof_of_Concept-2ecc71?style=flat-square)](notebooks/)
 [![Phase 2](https://img.shields.io/badge/Phase_2-Code_Complete,_Runs_Pending-f39c12?style=flat-square)](phase2_baseline_comparison/)
-[![Phase 3](https://img.shields.io/badge/Phase_3-Production_Pipeline-grey?style=flat-square)](phase3_pipeline/)
+[![Phase 3](https://img.shields.io/badge/Phase_3-Lite_+_Pro_Pipelines-2ecc71?style=flat-square)](phase3_pipeline/)
+[![Demo](https://img.shields.io/badge/Demo-Static_Showcase-3498db?style=flat-square)](demo/index.html)
 
 A portfolio project on PII redaction for legal text, anchored in the [Text Anonymization Benchmark](https://github.com/NorskRegnesentral/text-anonymization-benchmark) (TAB). Tests whether off-the-shelf NER is enough to anonymise court documents, and quantifies the residual mosaic / re-identification risk that NER alone cannot fix.
 
@@ -34,7 +35,11 @@ A portfolio project on PII redaction for legal text, anchored in the [Text Anony
 │   ├── 02_presidio_baseline.ipynb     Presidio (stock + custom CODE recogniser)
 │   ├── 03_finetune_roberta.ipynb      RoBERTa fine-tuned on TAB train
 │   └── 04_head_to_head.ipynb          comparison plots
-├── phase3_pipeline/                   Phase 3 — scoped, not yet built
+├── phase3_pipeline/                   Phase 3 — Lite vs Pro pipelines
+│   └── notebooks/
+│       ├── 01_lite_walkthrough.ipynb
+│       ├── 02_pro_walkthrough.ipynb
+│       └── 03_lite_vs_pro.ipynb
 ├── src/anonymisation/                 reusable Python package
 │   ├── data.py mapping.py             TAB loader + spaCy mapping
 │   ├── evaluation.py                  span-level P/R/F1
@@ -42,11 +47,25 @@ A portfolio project on PII redaction for legal text, anchored in the [Text Anony
 │   ├── predictors.py                  HF / Presidio / fine-tuned adapters
 │   ├── iob.py                         BIO tagging utilities for fine-tuning
 │   ├── device.py                      CUDA / MPS / CPU detection
-│   └── demo.py                        try-it-yourself helper
+│   ├── demo.py                        Phase 1 try-it-yourself helper
+│   ├── cli.py                         CLI entry point (python -m anonymisation.cli)
+│   └── pipeline/                      Phase 3 redaction pipelines
+│       ├── types.py                   Span, AuditEntry, RedactionResult
+│       ├── regex_pass.py              case nos, IBANs, phones, emails
+│       ├── roles.py                   DIRECT/QUASI default classifier
+│       ├── generalization.py          per-entity-type generalization rules
+│       ├── scorer.py                  MosaicScorer (k-anonymity over a haystack)
+│       ├── base.py                    shared Pipeline base class
+│       ├── lite.py                    LitePipeline — DIRECT only
+│       └── pro.py                     ProPipeline — DIRECT + iterate-until-safe
 ├── figures/                           plots for the writeup
 ├── results/                           Phase 1 per-entity metrics CSV
 ├── writeup/                           portfolio narrative (markdown)
-└── demo/                              demo plan
+└── demo/                              Static side-by-side showcase
+    ├── index.html                     the showcase (open in browser)
+    ├── build_showcase.py               regenerator script
+    ├── examples/                      input samples
+    └── app.py                         (deferred — Gradio interactive version)
 ```
 
 ---
@@ -102,8 +121,10 @@ The qualitative conclusions hold — the smaller model is just worse on PERSON a
 
 - [x] **Phase 1 — Proof of concept.** Baseline measurement + mosaic-effect quantification.
 - [~] **Phase 2 — Baseline comparison + fine-tune.** Code complete (4 notebooks under `phase2_baseline_comparison/`), runs pending. spaCy vs `dslim/bert-base-NER` vs Microsoft Presidio vs RoBERTa fine-tuned on TAB train.
-- [ ] **Phase 3 — Production pipeline.** NER + regex + mosaic-risk scorer + audit log + human-in-the-loop fallback. Deployable as a Docker image for on-prem use.
-- [ ] **Live demo.** Gradio app on HuggingFace Spaces, embedded in the portfolio site.
+- [x] **Phase 3 — Production pipeline (two variants).** `LitePipeline` (DIRECT-only) and `ProPipeline` (DIRECT + mosaic-aware QUASI generalization). Library + CLI + walkthrough notebooks.
+- [x] **Static demo.** Self-contained `demo/index.html` — Lite vs Pro on three illustrative inputs, no runtime deps for visitors.
+- [ ] **Interactive demo.** Gradio version (`demo/app.py`) — deferred; revive once the Gradio/spaCy dep tree settles.
+- [ ] **Phase 3.1 — Productionisation.** Docker packaging, FastAPI service, layout-aware extraction (PDF/DOCX), human-in-the-loop UI around the audit log.
 
 ---
 
