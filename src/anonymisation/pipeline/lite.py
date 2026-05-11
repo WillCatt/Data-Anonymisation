@@ -13,30 +13,55 @@ as DIRECT.
 
 The output is human-readable, retains every QUASI mention untouched, and
 runs in O(text length) regardless of corpus size.
+
+Pseudonymisation
+----------------
+Construct with `pseudonymise=True` to get referential tokens
+(`[PERSON_A]`, `[PERSON_B]`, …) instead of plain `[PERSON]` tags.
+The same surface form gets the same token within the document; the
+mapping is exposed as `result.pseudonym_vault`. Pair with
+`pseudonymise.restore()` to round-trip an LLM answer back to original
+names locally, without ever exposing the names to the LLM.
 """
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
 from .base import Pipeline
+from .pseudonymise import Pseudonymiser
 from .types import AuditEntry, RedactionResult, Span
 
 
 class LitePipeline(Pipeline):
     """DIRECT-only redaction. No mosaic-risk scoring."""
 
+    def __init__(self, ner_provider, *, pseudonymise: bool = False, **kwargs):
+        super().__init__(ner_provider, **kwargs)
+        self.pseudonymise = pseudonymise
+
     def _redact(self, text: str) -> RedactionResult:
         spans = self.detect_spans(text)
         audit: List[AuditEntry] = []
+        pseudo: Optional[Pseudonymiser] = (
+            Pseudonymiser() if self.pseudonymise else None
+        )
 
         for span in spans:
             if span.identifier_role == "DIRECT":
-                span.replacement = f"[{span.entity_type}]"
+                if pseudo is not None:
+                    span.replacement = pseudo.token_for(span.entity_type, span.text)
+                    rationale = (
+                        f"DIRECT identifier ({span.entity_type}); pseudonymised to "
+                        f"{span.replacement} (vault keeps the original)."
+                    )
+                else:
+                    span.replacement = f"[{span.entity_type}]"
+                    rationale = (
+                        f"DIRECT identifier ({span.entity_type}); always suppressed in Lite."
+                    )
                 span.generalization_level = 3  # immediate suppression
                 audit.append(AuditEntry(
-                    span=span,
-                    action="redact",
-                    rationale=f"DIRECT identifier ({span.entity_type}); always suppressed in Lite.",
+                    span=span, action="redact", rationale=rationale,
                 ))
             else:
                 # QUASI — leave intact, but record the decision
@@ -58,4 +83,5 @@ class LitePipeline(Pipeline):
             mosaic_risk_final=None,
             iterations_used=0,
             converged=True,
+            pseudonym_vault=(pseudo.vault if pseudo is not None else {}),
         )

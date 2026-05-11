@@ -1,0 +1,58 @@
+{
+  "baseline": {
+    "label": "baseline",
+    "n_entities": 17448,
+    "n_mentions": 20809,
+    "macro_recall": 0.8399498474550056,
+    "micro_recall": 0.8360324859435821
+  },
+  "with_coref": {
+    "label": "with_coref",
+    "n_entities": 17448,
+    "n_mentions": 20809,
+    "macro_recall": 0.8399899666663766,
+    "micro_recall": 0.8362727665913787
+  },
+  "per_type": [
+    {
+      "entity_type": "CODE",
+      "baseline": 0.005583126550868486,
+      "with_coref": 0.005583126550868486
+    },
+    {
+      "entity_type": "DATETIME",
+      "baseline": 0.9942311726452696,
+      "with_coref": 0.9942311726452696
+    },
+    {
+      "entity_type": "DEM",
+      "baseline": 0.3351528384279476,
+      "with_coref": 0.3351528384279476
+    },
+    {
+      "entity_type": "LOC",
+      "baseline": 0.9503448275862069,
+      "with_coref": 0.9503448275862069
+    },
+    {
+      "entity_type": "MISC",
+      "baseline": 0.07792207792207792,
+      "with_coref": 0.07792207792207792
+    },
+    {
+      "entity_type": "ORG",
+      "baseline": 0.8059244126659857,
+      "with_coref": 0.8069458631256384
+    },
+    {
+      "entity_type": "PERSON",
+      "baseline": 0.9543036750483559,
+      "with_coref": 0.9550290135396519
+    },
+    {
+      "entity_type": "QUANTITY",
+      "baseline": 0.9894578313253012,
+      "with_coref": 0.9894578313253012
+    }
+  ]
+}

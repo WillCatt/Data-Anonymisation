@@ -52,18 +52,46 @@ header p { color: var(--muted); margin: 0.25rem 0; }
 /* CSS-only tab switching */
 #tab1:checked ~ .tabs label[for=tab1],
 #tab2:checked ~ .tabs label[for=tab2],
-#tab3:checked ~ .tabs label[for=tab3] {
+#tab3:checked ~ .tabs label[for=tab3],
+#tab4:checked ~ .tabs label[for=tab4] {
   background: var(--panel); color: var(--text);
   border-color: var(--border); border-bottom-color: var(--panel);
   margin-bottom: -1px;
 }
 #tab1:checked ~ .panels #panel1,
 #tab2:checked ~ .panels #panel2,
-#tab3:checked ~ .panels #panel3 { display: block; }
+#tab3:checked ~ .panels #panel3,
+#tab4:checked ~ .panels #panel4 { display: block; }
 
 .sample-blurb {
   background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
   padding: 0.75rem 1rem; color: var(--muted); margin-bottom: 1rem; font-size: 0.95rem;
+}
+
+.category-summary {
+  margin: 0 0 1.25rem; padding: 0.75rem 1rem;
+  background: #f1f8ff; border-left: 3px solid var(--accent);
+  border-radius: 0 4px 4px 0; font-size: 0.92rem; color: var(--text);
+}
+
+.example-card {
+  background: transparent;
+  margin-bottom: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+.example-card:first-child { border-top: none; padding-top: 0; }
+.example-header {
+  display: flex; align-items: center; gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.example-header h2 {
+  margin: 0; font-size: 1.05rem; font-weight: 600;
+}
+.example-header .pill {
+  display: inline-block; padding: 0.1rem 0.5rem; border-radius: 1rem;
+  background: var(--code-bg); color: var(--muted);
+  font-size: 0.75rem; font-family: ui-monospace, SFMono-Regular, monospace;
 }
 .cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
 @media (max-width: 800px) { .cols { grid-template-columns: 1fr; } }
@@ -79,6 +107,39 @@ header p { color: var(--muted); margin: 0.25rem 0; }
 }
 .col h3 .badge.pro { background: #e6ffed; color: var(--green); }
 .col h3 .badge.lite { background: #fff5b1; color: var(--tag-text); }
+.col h3 .badge.pseudo { background: #ddf4ff; color: var(--accent); }
+.col h3 .badge.vault { background: #f4f1ff; color: #6f42c1; }
+
+.vault-table {
+  width: 100%; border-collapse: collapse; font-size: 0.85rem;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+.vault-table th, .vault-table td {
+  text-align: left; padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--border);
+}
+.vault-table th { background: var(--code-bg); color: var(--muted); font-weight: 600; }
+.vault-table td.token { color: var(--accent); font-weight: 600; }
+
+.round-trip {
+  margin-top: 1.5rem; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 6px; padding: 1.25rem 1.5rem;
+}
+.round-trip h3 { margin: 0 0 1rem; font-size: 1rem; }
+.round-trip-step {
+  margin-bottom: 1rem; padding-left: 1.5rem; position: relative;
+  border-left: 2px solid var(--accent);
+}
+.round-trip-step:last-of-type { margin-bottom: 0; }
+.step-label {
+  font-size: 0.85rem; color: var(--muted); margin-bottom: 0.4rem; font-weight: 600;
+}
+.step-body {
+  background: var(--code-bg); padding: 0.75rem 1rem; border-radius: 4px;
+  font-size: 0.9rem; line-height: 1.55;
+}
+.round-trip-note {
+  margin: 1rem 0 0; font-size: 0.85rem; color: var(--muted); font-style: italic;
+}
 .col .body { white-space: pre-wrap; font-size: 0.9rem; line-height: 1.55; }
 .col .body .tag {
   background: var(--tag-bg); color: var(--tag-text);
@@ -157,12 +218,19 @@ footer a:hover { text-decoration: underline; }
     document corpus.
   </div>
 
-  <input type="radio" name="tab" id="tab1" checked><input type="radio" name="tab" id="tab2"><input type="radio" name="tab" id="tab3">
-  <div class="tabs"><label for="tab1">Sample 1 — demographic-heavy</label><label for="tab2">Sample 2 — corporate litigation</label><label for="tab3">Sample 3 — medical / structured ID</label></div>
+  <input type="radio" name="tab" id="tab1" checked><input type="radio" name="tab" id="tab2"><input type="radio" name="tab" id="tab3"><input type="radio" name="tab" id="tab4">
+  <div class="tabs"><label for="tab1">Law — civil rights</label><label for="tab2">Law — corporate</label><label for="tab3">Medical</label><label for="tab4">Pseudonymisation</label></div>
   <div class="panels">
     
     <div class="panel" id="panel1">
-      <div class="sample-blurb">ECHR-style application: a single individual described by name, age, nationality, ethnicity, location, occupation, and date of complaint. Lots of QUASI surface area; Pro generalizes them to a milder form.</div>
+      <div class="category-summary">ECHR-style applications: individual complainants, demographic context, application numbers. The QUASI fingerprint (date + location + nationality + role) is what the mosaic loop has to wrestle with.</div>
+      
+    <div class="example-card">
+      <div class="example-header">
+        <h2>Demographic-heavy application</h2>
+        <span class="pill">k_target=5 · iters=3</span>
+      </div>
+      <div class="sample-blurb">Bulgarian nurse, single applicant, lots of QUASI surface area. Pro converges at level 1 (mild generalisation).</div>
       <div class="cols">
         <div class="col">
           <h3>Original</h3>
@@ -170,11 +238,11 @@ footer a:hover { text-decoration: underline; }
         </div>
         <div class="col">
           <h3>Lite <span class="badge lite">DIRECT-only</span></h3>
-          <div class="body">The applicant, <span class="tag">[PERSON]</span>, is a 47-year-old Bulgarian national living in Plovdiv. On 12 March 2018 she filed a complaint (<span class="tag">[CODE]</span>) against the <span class="tag">[ORG]</span> alleging discrimination on grounds of her Roma ethnicity. Maria has been employed as a nurse since 2010 and is the mother of three children.</div>
+          <div class="body">The applicant, <span class="tag">[PERSON]</span>, is a 47-year-old Bulgarian national living in Plovdiv. On 12 March 2018 she filed a complaint (<span class="tag">[CODE]</span>) against the <span class="tag">[ORG]</span> alleging discrimination on grounds of her Roma ethnicity. <span class="tag">[PERSON]</span> has been employed as a nurse since 2010 and is the mother of three children.</div>
         </div>
         <div class="col">
           <h3>Pro <span class="badge pro">DIRECT + mosaic-aware QUASI</span></h3>
-          <div class="body">The applicant, <span class="tag">[PERSON]</span>, is a about 40 European national living in Bulgaria. On 2018 she filed a complaint (<span class="tag">[CODE]</span>) against the <span class="tag">[ORG]</span> alleging discrimination on grounds of her ethnic minority ethnicity. Maria has been employed as a nurse since 2010 and is the mother of three children.</div>
+          <div class="body">The applicant, <span class="tag">[PERSON]</span>, is a about 40 European national living in Bulgaria. On 2018 she filed a complaint (<span class="tag">[CODE]</span>) against the <span class="tag">[ORG]</span> alleging discrimination on grounds of her ethnic minority ethnicity. <span class="tag">[PERSON]</span> has been employed as a nurse since 2010 and is the mother of three children.</div>
           <div class="mosaic">
             <span class="k">k_initial = 1</span>
             <span> → </span>
@@ -185,13 +253,88 @@ footer a:hover { text-decoration: underline; }
         </div>
       </div>
       <details>
-        <summary>Pro audit log (every decision the pipeline made)</summary>
-        <table class="audit-table"><tr><th>iter</th><th>type</th><th>role</th><th>action</th><th>original</th><th>replacement</th></tr><tr><td class="iter">0</td><td>PERSON</td><td>DIRECT</td><td class="action redact">redact</td><td>Maria Petrova</td><td>→ [PERSON]</td></tr><tr><td class="iter">0</td><td>CODE</td><td>DIRECT</td><td class="action redact">redact</td><td>Application no. 12345/67</td><td>→ [CODE]</td></tr><tr><td class="iter">0</td><td>ORG</td><td>DIRECT</td><td class="action redact">redact</td><td>Sofia District Court</td><td>→ [ORG]</td></tr><tr><td class="iter">1</td><td>QUANTITY</td><td>QUASI</td><td class="action generalize">generalize</td><td>47-year-old</td><td>→ about 40</td></tr><tr><td class="iter">1</td><td>DEM</td><td>QUASI</td><td class="action generalize">generalize</td><td>Bulgarian</td><td>→ European</td></tr><tr><td class="iter">1</td><td>LOC</td><td>QUASI</td><td class="action generalize">generalize</td><td>Plovdiv</td><td>→ Bulgaria</td></tr><tr><td class="iter">1</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>12 March 2018</td><td>→ 2018</td></tr><tr><td class="iter">1</td><td>DEM</td><td>QUASI</td><td class="action generalize">generalize</td><td>Roma</td><td>→ ethnic minority</td></tr><tr><td class="iter">1</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>2010</td><td>→ 2010</td></tr></table>
+        <summary>Pro audit log</summary>
+        <table class="audit-table"><tr><th>iter</th><th>type</th><th>role</th><th>action</th><th>original</th><th>replacement</th></tr><tr><td class="iter">0</td><td>PERSON</td><td>DIRECT</td><td class="action redact">redact</td><td>Maria Petrova</td><td>→ [PERSON]</td></tr><tr><td class="iter">0</td><td>CODE</td><td>DIRECT</td><td class="action redact">redact</td><td>Application no. 12345/67</td><td>→ [CODE]</td></tr><tr><td class="iter">0</td><td>ORG</td><td>DIRECT</td><td class="action redact">redact</td><td>Sofia District Court</td><td>→ [ORG]</td></tr><tr><td class="iter">0</td><td>PERSON</td><td>DIRECT</td><td class="action redact">redact</td><td>Maria</td><td>→ [PERSON]</td></tr><tr><td class="iter">1</td><td>QUANTITY</td><td>QUASI</td><td class="action generalize">generalize</td><td>47-year-old</td><td>→ about 40</td></tr><tr><td class="iter">1</td><td>DEM</td><td>QUASI</td><td class="action generalize">generalize</td><td>Bulgarian</td><td>→ European</td></tr><tr><td class="iter">1</td><td>LOC</td><td>QUASI</td><td class="action generalize">generalize</td><td>Plovdiv</td><td>→ Bulgaria</td></tr><tr><td class="iter">1</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>12 March 2018</td><td>→ 2018</td></tr><tr><td class="iter">1</td><td>DEM</td><td>QUASI</td><td class="action generalize">generalize</td><td>Roma</td><td>→ ethnic minority</td></tr><tr><td class="iter">1</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>2010</td><td>→ 2010</td></tr></table>
       </details>
     </div>
     
+    <div class="example-card">
+      <div class="example-header">
+        <h2>Asylum-seeker — single applicant</h2>
+        <span class="pill">k_target=5 · iters=3</span>
+      </div>
+      <div class="sample-blurb">Tighter document, fewer QUASI mentions. With this haystack the residual fingerprint is moderately distinctive — Pro converges at level 1 after one iteration.</div>
+      <div class="cols">
+        <div class="col">
+          <h3>Original</h3>
+          <div class="body">The applicant, Dimitris Karagiannis, is a 28-year-old Greek national who sought asylum in Athens on 5 June 2019 after fleeing political persecution. The case (Application no. 7821/19) was heard by the Athens Court of First Instance. Mr Karagiannis is unmarried and was previously employed as a journalist.</div>
+        </div>
+        <div class="col">
+          <h3>Lite <span class="badge lite">DIRECT-only</span></h3>
+          <div class="body">The applicant, <span class="tag">[PERSON]</span>, is a 28-year-old Greek national who sought asylum in Athens on 5 June 2019 after fleeing political persecution. The case (<span class="tag">[CODE]</span>) was heard by the <span class="tag">[ORG]</span>. <span class="tag">[PERSON]</span> is unmarried and was previously employed as a journalist.</div>
+        </div>
+        <div class="col">
+          <h3>Pro <span class="badge pro">DIRECT + mosaic-aware QUASI</span></h3>
+          <div class="body">The applicant, <span class="tag">[PERSON]</span>, is a about 20 European national who sought asylum in Greece on 2019 after fleeing political persecution. The case (<span class="tag">[CODE]</span>) was heard by the <span class="tag">[ORG]</span>. <span class="tag">[PERSON]</span> is unmarried and was previously employed as a journalist.</div>
+          <div class="mosaic">
+            <span class="k">k_initial = 1</span>
+            <span> → </span>
+            <span class="k">k_final = 6</span>
+            <span> · iterations: 1 · </span>
+            <span class="converged">✓ converged</span>
+          </div>
+        </div>
+      </div>
+      <details>
+        <summary>Pro audit log</summary>
+        <table class="audit-table"><tr><th>iter</th><th>type</th><th>role</th><th>action</th><th>original</th><th>replacement</th></tr><tr><td class="iter">0</td><td>PERSON</td><td>DIRECT</td><td class="action redact">redact</td><td>Dimitris Karagiannis</td><td>→ [PERSON]</td></tr><tr><td class="iter">0</td><td>CODE</td><td>DIRECT</td><td class="action redact">redact</td><td>Application no. 7821/19</td><td>→ [CODE]</td></tr><tr><td class="iter">0</td><td>ORG</td><td>DIRECT</td><td class="action redact">redact</td><td>Athens Court of First Instance</td><td>→ [ORG]</td></tr><tr><td class="iter">0</td><td>PERSON</td><td>DIRECT</td><td class="action redact">redact</td><td>Mr Karagiannis</td><td>→ [PERSON]</td></tr><tr><td class="iter">1</td><td>QUANTITY</td><td>QUASI</td><td class="action generalize">generalize</td><td>28-year-old</td><td>→ about 20</td></tr><tr><td class="iter">1</td><td>DEM</td><td>QUASI</td><td class="action generalize">generalize</td><td>Greek</td><td>→ European</td></tr><tr><td class="iter">1</td><td>LOC</td><td>QUASI</td><td class="action generalize">generalize</td><td>Athens</td><td>→ Greece</td></tr><tr><td class="iter">1</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>5 June 2019</td><td>→ 2019</td></tr></table>
+      </details>
+    </div>
+    
+    <div class="example-card">
+      <div class="example-header">
+        <h2>Press freedom — Pro fallback to suppression</h2>
+        <span class="pill">k_target=5 · iters=2</span>
+      </div>
+      <div class="sample-blurb">Highly distinctive document (Russian journalist, named publication, specific date, specific location). The fingerprint never reaches k=5 in the haystack, so the iterate-until-safe loop runs out of room and falls back to full suppression. This is the converged=False case — graceful degradation rather than silent partial leakage.</div>
+      <div class="cols">
+        <div class="col">
+          <h3>Original</h3>
+          <div class="body">Anastasia Volkova, a 41-year-old Russian journalist, was detained in Moscow on 14 November 2017 in connection with her reporting for the Open Forum publication. She filed a complaint (Application no. 30192/18) against the Russian Federation alleging breach of Article 10. Ms Volkova lives in St. Petersburg and has two children.</div>
+        </div>
+        <div class="col">
+          <h3>Lite <span class="badge lite">DIRECT-only</span></h3>
+          <div class="body"><span class="tag">[PERSON]</span>, a 41-year-old Russian journalist, was detained in Moscow on 14 November 2017 in connection with her reporting for the <span class="tag">[ORG]</span> publication. She filed a complaint (<span class="tag">[CODE]</span>) against the <span class="tag">[ORG]</span> alleging breach of Article 10. <span class="tag">[PERSON]</span> lives in St. Petersburg and has two children.</div>
+        </div>
+        <div class="col">
+          <h3>Pro <span class="badge pro">DIRECT + mosaic-aware QUASI</span></h3>
+          <div class="body"><span class="tag">[PERSON]</span>, a <span class="tag">[QUANTITY]</span> <span class="tag">[DEM]</span> journalist, was detained in <span class="tag">[LOC]</span> on <span class="tag">[DATETIME]</span> in connection with her reporting for the <span class="tag">[ORG]</span> publication. She filed a complaint (<span class="tag">[CODE]</span>) against the <span class="tag">[ORG]</span> alleging breach of Article 10. <span class="tag">[PERSON]</span> lives in <span class="tag">[LOC]</span> and has two children.</div>
+          <div class="mosaic">
+            <span class="k">k_initial = 1</span>
+            <span> → </span>
+            <span class="k">k_final = 54</span>
+            <span> · iterations: 3 · </span>
+            <span class="unconverged">✗ fallback to suppression</span>
+          </div>
+        </div>
+      </div>
+      <details>
+        <summary>Pro audit log</summary>
+        <table class="audit-table"><tr><th>iter</th><th>type</th><th>role</th><th>action</th><th>original</th><th>replacement</th></tr><tr><td class="iter">0</td><td>PERSON</td><td>DIRECT</td><td class="action redact">redact</td><td>Anastasia Volkova</td><td>→ [PERSON]</td></tr><tr><td class="iter">0</td><td>ORG</td><td>DIRECT</td><td class="action redact">redact</td><td>Open Forum</td><td>→ [ORG]</td></tr><tr><td class="iter">0</td><td>CODE</td><td>DIRECT</td><td class="action redact">redact</td><td>Application no. 30192/18</td><td>→ [CODE]</td></tr><tr><td class="iter">0</td><td>ORG</td><td>DIRECT</td><td class="action redact">redact</td><td>Russian Federation</td><td>→ [ORG]</td></tr><tr><td class="iter">0</td><td>PERSON</td><td>DIRECT</td><td class="action redact">redact</td><td>Ms Volkova</td><td>→ [PERSON]</td></tr><tr><td class="iter">1</td><td>QUANTITY</td><td>QUASI</td><td class="action generalize">generalize</td><td>41-year-old</td><td>→ [QUANTITY]</td></tr><tr><td class="iter">1</td><td>DEM</td><td>QUASI</td><td class="action generalize">generalize</td><td>Russian</td><td>→ [DEM]</td></tr><tr><td class="iter">1</td><td>LOC</td><td>QUASI</td><td class="action generalize">generalize</td><td>Moscow</td><td>→ [LOC]</td></tr><tr><td class="iter">1</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>14 November 2017</td><td>→ [DATETIME]</td></tr><tr><td class="iter">1</td><td>LOC</td><td>QUASI</td><td class="action generalize">generalize</td><td>St. Petersburg</td><td>→ [LOC]</td></tr><tr><td class="iter">2</td><td>QUANTITY</td><td>QUASI</td><td class="action generalize">generalize</td><td>41-year-old</td><td>→ [QUANTITY]</td></tr><tr><td class="iter">2</td><td>DEM</td><td>QUASI</td><td class="action generalize">generalize</td><td>Russian</td><td>→ [DEM]</td></tr><tr><td class="iter">2</td><td>LOC</td><td>QUASI</td><td class="action generalize">generalize</td><td>Moscow</td><td>→ [LOC]</td></tr><tr><td class="iter">2</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>14 November 2017</td><td>→ [DATETIME]</td></tr><tr><td class="iter">2</td><td>LOC</td><td>QUASI</td><td class="action generalize">generalize</td><td>St. Petersburg</td><td>→ [LOC]</td></tr><tr><td class="iter">4</td><td>QUANTITY</td><td>QUASI</td><td class="action generalize">generalize</td><td>41-year-old</td><td>→ [QUANTITY]</td></tr><tr><td class="iter">4</td><td>DEM</td><td>QUASI</td><td class="action generalize">generalize</td><td>Russian</td><td>→ [DEM]</td></tr><tr><td class="iter">4</td><td>LOC</td><td>QUASI</td><td class="action generalize">generalize</td><td>Moscow</td><td>→ [LOC]</td></tr><tr><td class="iter">4</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>14 November 2017</td><td>→ [DATETIME]</td></tr><tr><td class="iter">4</td><td>LOC</td><td>QUASI</td><td class="action generalize">generalize</td><td>St. Petersburg</td><td>→ [LOC]</td></tr></table>
+      </details>
+    </div>
+    
+    </div>
+    
     <div class="panel" id="panel2">
-      <div class="sample-blurb">Settlement agreement summary: company, person, case number, financial amount, IBAN, dates. Most of the identifying load is DIRECT — Lite and Pro produce nearly the same output here.</div>
+      <div class="category-summary">Corporate litigation, M&amp;A confidentiality breaches, IP disputes. Most of the identifying load is DIRECT (company names, case file numbers, IBANs) so Lite and Pro often produce similar output. The regex pass earns its keep here.</div>
+      
+    <div class="example-card">
+      <div class="example-header">
+        <h2>Settlement summary</h2>
+        <span class="pill">k_target=5 · iters=3</span>
+      </div>
+      <div class="sample-blurb">Settlement agreement: company, named person, case number, IBAN, financial amount, multiple dates. Initial fingerprint already matches the haystack — Pro needs no QUASI work (k_initial ≥ k_target).</div>
       <div class="cols">
         <div class="col">
           <h3>Original</h3>
@@ -199,11 +342,11 @@ footer a:hover { text-decoration: underline; }
         </div>
         <div class="col">
           <h3>Lite <span class="badge lite">DIRECT-only</span></h3>
-          <div class="body">On 4 July 2022, <span class="tag">[ORG]</span> entered into a settlement agreement with <span class="tag">[PERSON]</span>, formerly senior counsel at the firm. The agreement, filed under <span class="tag">[CODE]</span>, covers the period from January 2019 to June 2022. Doe was based at the company&#x27;s Manchester office. The settlement amount of approximately £450,000 was confirmed via bank transfer to <span class="tag">[CODE]</span>.</div>
+          <div class="body">On 4 July 2022, <span class="tag">[ORG]</span> entered into a settlement agreement with <span class="tag">[PERSON]</span>, formerly senior counsel at the firm. The agreement, filed under <span class="tag">[CODE]</span>, covers the period from January 2019 to June 2022. <span class="tag">[PERSON]</span> was based at the company&#x27;s Manchester office. The settlement amount of approximately £450,000 was confirmed via bank transfer to <span class="tag">[CODE]</span>.</div>
         </div>
         <div class="col">
           <h3>Pro <span class="badge pro">DIRECT + mosaic-aware QUASI</span></h3>
-          <div class="body">On 4 July 2022, <span class="tag">[ORG]</span> entered into a settlement agreement with <span class="tag">[PERSON]</span>, formerly senior counsel at the firm. The agreement, filed under <span class="tag">[CODE]</span>, covers the period from January 2019 to June 2022. Doe was based at the company&#x27;s Manchester office. The settlement amount of approximately £450,000 was confirmed via bank transfer to <span class="tag">[CODE]</span>.</div>
+          <div class="body">On 4 July 2022, <span class="tag">[ORG]</span> entered into a settlement agreement with <span class="tag">[PERSON]</span>, formerly senior counsel at the firm. The agreement, filed under <span class="tag">[CODE]</span>, covers the period from January 2019 to June 2022. <span class="tag">[PERSON]</span> was based at the company&#x27;s Manchester office. The settlement amount of approximately £450,000 was confirmed via bank transfer to <span class="tag">[CODE]</span>.</div>
           <div class="mosaic">
             <span class="k">k_initial = 6</span>
             <span> → </span>
@@ -214,13 +357,88 @@ footer a:hover { text-decoration: underline; }
         </div>
       </div>
       <details>
-        <summary>Pro audit log (every decision the pipeline made)</summary>
-        <table class="audit-table"><tr><th>iter</th><th>type</th><th>role</th><th>action</th><th>original</th><th>replacement</th></tr><tr><td class="iter">0</td><td>ORG</td><td>DIRECT</td><td class="action redact">redact</td><td>Acme Holdings Ltd</td><td>→ [ORG]</td></tr><tr><td class="iter">0</td><td>PERSON</td><td>DIRECT</td><td class="action redact">redact</td><td>John Doe</td><td>→ [PERSON]</td></tr><tr><td class="iter">0</td><td>CODE</td><td>DIRECT</td><td class="action redact">redact</td><td>Case no. 4521/2022</td><td>→ [CODE]</td></tr><tr><td class="iter">0</td><td>CODE</td><td>DIRECT</td><td class="action redact">redact</td><td>GB29 NWBK 6016 1331 9268 19</td><td>→ [CODE]</td></tr><tr><td class="iter">0</td><td>DATETIME</td><td>QUASI</td><td class="action leave">leave</td><td>4 July 2022</td><td>→ —</td></tr><tr><td class="iter">0</td><td>DATETIME</td><td>QUASI</td><td class="action leave">leave</td><td>January 2019</td><td>→ —</td></tr><tr><td class="iter">0</td><td>DATETIME</td><td>QUASI</td><td class="action leave">leave</td><td>June 2022</td><td>→ —</td></tr><tr><td class="iter">0</td><td>LOC</td><td>QUASI</td><td class="action leave">leave</td><td>Manchester</td><td>→ —</td></tr><tr><td class="iter">0</td><td>QUANTITY</td><td>QUASI</td><td class="action leave">leave</td><td>£450,000</td><td>→ —</td></tr></table>
+        <summary>Pro audit log</summary>
+        <table class="audit-table"><tr><th>iter</th><th>type</th><th>role</th><th>action</th><th>original</th><th>replacement</th></tr><tr><td class="iter">0</td><td>ORG</td><td>DIRECT</td><td class="action redact">redact</td><td>Acme Holdings Ltd</td><td>→ [ORG]</td></tr><tr><td class="iter">0</td><td>PERSON</td><td>DIRECT</td><td class="action redact">redact</td><td>John Doe</td><td>→ [PERSON]</td></tr><tr><td class="iter">0</td><td>CODE</td><td>DIRECT</td><td class="action redact">redact</td><td>Case no. 4521/2022</td><td>→ [CODE]</td></tr><tr><td class="iter">0</td><td>PERSON</td><td>DIRECT</td><td class="action redact">redact</td><td>Doe</td><td>→ [PERSON]</td></tr><tr><td class="iter">0</td><td>CODE</td><td>DIRECT</td><td class="action redact">redact</td><td>GB29 NWBK 6016 1331 9268 19</td><td>→ [CODE]</td></tr><tr><td class="iter">0</td><td>DATETIME</td><td>QUASI</td><td class="action leave">leave</td><td>4 July 2022</td><td>→ —</td></tr><tr><td class="iter">0</td><td>DATETIME</td><td>QUASI</td><td class="action leave">leave</td><td>January 2019</td><td>→ —</td></tr><tr><td class="iter">0</td><td>DATETIME</td><td>QUASI</td><td class="action leave">leave</td><td>June 2022</td><td>→ —</td></tr><tr><td class="iter">0</td><td>LOC</td><td>QUASI</td><td class="action leave">leave</td><td>Manchester</td><td>→ —</td></tr><tr><td class="iter">0</td><td>QUANTITY</td><td>QUASI</td><td class="action leave">leave</td><td>£450,000</td><td>→ —</td></tr></table>
       </details>
     </div>
     
+    <div class="example-card">
+      <div class="example-header">
+        <h2>M&amp;A confidentiality breach</h2>
+        <span class="pill">k_target=5 · iters=3</span>
+      </div>
+      <div class="sample-blurb">Former director, named M&amp;A counterparty, multiple dates. Pro converges at level 1: dates collapse to the year, Edinburgh broadens to the United Kingdom.</div>
+      <div class="cols">
+        <div class="col">
+          <h3>Original</h3>
+          <div class="body">Globex Industries Plc has commenced proceedings (Case no. 8847/2024) against former director Helena Park for breach of NDA dated 11 January 2024. The dispute concerns disclosures made during preliminary M&amp;A discussions with Initech Holdings. Ms Park left the company on 30 September 2023 after seven years as Head of Strategy and is based in Edinburgh.</div>
+        </div>
+        <div class="col">
+          <h3>Lite <span class="badge lite">DIRECT-only</span></h3>
+          <div class="body"><span class="tag">[ORG]</span> has commenced proceedings (<span class="tag">[CODE]</span>) against former director <span class="tag">[PERSON]</span> for breach of NDA dated 11 January 2024. The dispute concerns disclosures made during preliminary M&amp;A discussions with <span class="tag">[ORG]</span>. <span class="tag">[PERSON]</span> left the company on 30 September 2023 after seven years as Head of Strategy and is based in Edinburgh.</div>
+        </div>
+        <div class="col">
+          <h3>Pro <span class="badge pro">DIRECT + mosaic-aware QUASI</span></h3>
+          <div class="body"><span class="tag">[ORG]</span> has commenced proceedings (<span class="tag">[CODE]</span>) against former director <span class="tag">[PERSON]</span> for breach of NDA dated 2024. The dispute concerns disclosures made during preliminary M&amp;A discussions with <span class="tag">[ORG]</span>. <span class="tag">[PERSON]</span> left the company on 2023 after seven years as Head of Strategy and is based in United Kingdom.</div>
+          <div class="mosaic">
+            <span class="k">k_initial = 1</span>
+            <span> → </span>
+            <span class="k">k_final = 6</span>
+            <span> · iterations: 1 · </span>
+            <span class="converged">✓ converged</span>
+          </div>
+        </div>
+      </div>
+      <details>
+        <summary>Pro audit log</summary>
+        <table class="audit-table"><tr><th>iter</th><th>type</th><th>role</th><th>action</th><th>original</th><th>replacement</th></tr><tr><td class="iter">0</td><td>ORG</td><td>DIRECT</td><td class="action redact">redact</td><td>Globex Industries Plc</td><td>→ [ORG]</td></tr><tr><td class="iter">0</td><td>CODE</td><td>DIRECT</td><td class="action redact">redact</td><td>Case no. 8847/2024</td><td>→ [CODE]</td></tr><tr><td class="iter">0</td><td>PERSON</td><td>DIRECT</td><td class="action redact">redact</td><td>Helena Park</td><td>→ [PERSON]</td></tr><tr><td class="iter">0</td><td>ORG</td><td>DIRECT</td><td class="action redact">redact</td><td>Initech Holdings</td><td>→ [ORG]</td></tr><tr><td class="iter">0</td><td>PERSON</td><td>DIRECT</td><td class="action redact">redact</td><td>Ms Park</td><td>→ [PERSON]</td></tr><tr><td class="iter">1</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>11 January 2024</td><td>→ 2024</td></tr><tr><td class="iter">1</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>30 September 2023</td><td>→ 2023</td></tr><tr><td class="iter">1</td><td>LOC</td><td>QUASI</td><td class="action generalize">generalize</td><td>Edinburgh</td><td>→ United Kingdom</td></tr></table>
+      </details>
+    </div>
+    
+    <div class="example-card">
+      <div class="example-header">
+        <h2>IP licensing settlement</h2>
+        <span class="pill">k_target=5 · iters=3</span>
+      </div>
+      <div class="sample-blurb">Patent dispute with a financial figure and an internal engineer named. Pro converges at level 1; Manchester becomes United Kingdom and the £2.3M becomes a rounded amount.</div>
+      <div class="cols">
+        <div class="col">
+          <h3>Original</h3>
+          <div class="body">A patent licensing dispute between Northwind Energy Ltd and Stark Renewables (Case no. 1162/2023) was settled on 22 August 2024 for approximately £2,300,000. Northwind, headquartered in Manchester, alleged unauthorised use of its turbine control technology by Stark&#x27;s engineering team led by Marcus Rivers since 2019.</div>
+        </div>
+        <div class="col">
+          <h3>Lite <span class="badge lite">DIRECT-only</span></h3>
+          <div class="body">A patent licensing dispute between <span class="tag">[ORG]</span> and <span class="tag">[ORG]</span> (<span class="tag">[CODE]</span>) was settled on 22 August 2024 for approximately £2,300,000. <span class="tag">[ORG]</span>, headquartered in Manchester, alleged unauthorised use of its turbine control technology by <span class="tag">[ORG]</span>&#x27;s engineering team led by <span class="tag">[PERSON]</span> since 2019.</div>
+        </div>
+        <div class="col">
+          <h3>Pro <span class="badge pro">DIRECT + mosaic-aware QUASI</span></h3>
+          <div class="body">A patent licensing dispute between <span class="tag">[ORG]</span> and <span class="tag">[ORG]</span> (<span class="tag">[CODE]</span>) was settled on 2024 for approximately about 2,000,000. <span class="tag">[ORG]</span>, headquartered in United Kingdom, alleged unauthorised use of its turbine control technology by <span class="tag">[ORG]</span>&#x27;s engineering team led by <span class="tag">[PERSON]</span> since 2019.</div>
+          <div class="mosaic">
+            <span class="k">k_initial = 1</span>
+            <span> → </span>
+            <span class="k">k_final = 6</span>
+            <span> · iterations: 1 · </span>
+            <span class="converged">✓ converged</span>
+          </div>
+        </div>
+      </div>
+      <details>
+        <summary>Pro audit log</summary>
+        <table class="audit-table"><tr><th>iter</th><th>type</th><th>role</th><th>action</th><th>original</th><th>replacement</th></tr><tr><td class="iter">0</td><td>ORG</td><td>DIRECT</td><td class="action redact">redact</td><td>Northwind Energy Ltd</td><td>→ [ORG]</td></tr><tr><td class="iter">0</td><td>ORG</td><td>DIRECT</td><td class="action redact">redact</td><td>Stark Renewables</td><td>→ [ORG]</td></tr><tr><td class="iter">0</td><td>CODE</td><td>DIRECT</td><td class="action redact">redact</td><td>Case no. 1162/2023</td><td>→ [CODE]</td></tr><tr><td class="iter">0</td><td>ORG</td><td>DIRECT</td><td class="action redact">redact</td><td>Northwind</td><td>→ [ORG]</td></tr><tr><td class="iter">0</td><td>ORG</td><td>DIRECT</td><td class="action redact">redact</td><td>Stark</td><td>→ [ORG]</td></tr><tr><td class="iter">0</td><td>PERSON</td><td>DIRECT</td><td class="action redact">redact</td><td>Marcus Rivers</td><td>→ [PERSON]</td></tr><tr><td class="iter">1</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>22 August 2024</td><td>→ 2024</td></tr><tr><td class="iter">1</td><td>QUANTITY</td><td>QUASI</td><td class="action generalize">generalize</td><td>£2,300,000</td><td>→ about 2,000,000</td></tr><tr><td class="iter">1</td><td>LOC</td><td>QUASI</td><td class="action generalize">generalize</td><td>Manchester</td><td>→ United Kingdom</td></tr><tr><td class="iter">1</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>2019</td><td>→ 2019</td></tr></table>
+      </details>
+    </div>
+    
+    </div>
+    
     <div class="panel" id="panel3">
-      <div class="sample-blurb">Tighter document with a DOB, location, occupation, sensitive medical context, and an NHS number. The regex pass catches the NHS number. Pro converges at deeper generalization because the QUASI fingerprint is otherwise quite distinctive.</div>
+      <div class="category-summary">Patient records and insurance claims. NHS numbers come out via the regex pass. The QUASI fingerprint (DOB + location + occupation + admission date) is typically distinctive — Pro tends to converge at deeper generalisation.</div>
+      
+    <div class="example-card">
+      <div class="example-header">
+        <h2>Patient record (Sarah Khan)</h2>
+        <span class="pill">k_target=5 · iters=3</span>
+      </div>
+      <div class="sample-blurb">DOB, location, occupation, sensitive medical context, and an NHS number. Pro converges at level 2: DOB → decade, London → Europe.</div>
       <div class="cols">
         <div class="col">
           <h3>Original</h3>
@@ -243,9 +461,214 @@ footer a:hover { text-decoration: underline; }
         </div>
       </div>
       <details>
-        <summary>Pro audit log (every decision the pipeline made)</summary>
+        <summary>Pro audit log</summary>
         <table class="audit-table"><tr><th>iter</th><th>type</th><th>role</th><th>action</th><th>original</th><th>replacement</th></tr><tr><td class="iter">0</td><td>PERSON</td><td>DIRECT</td><td class="action redact">redact</td><td>Sarah Khan</td><td>→ [PERSON]</td></tr><tr><td class="iter">0</td><td>ORG</td><td>DIRECT</td><td class="action redact">redact</td><td>FinTech Co</td><td>→ [ORG]</td></tr><tr><td class="iter">0</td><td>CODE</td><td>DIRECT</td><td class="action redact">redact</td><td>943 476 5919</td><td>→ [CODE]</td></tr><tr><td class="iter">1</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>14 February 1985</td><td>→ 1980s</td></tr><tr><td class="iter">1</td><td>LOC</td><td>QUASI</td><td class="action generalize">generalize</td><td>London</td><td>→ Europe</td></tr><tr><td class="iter">1</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>2020</td><td>→ 2020s</td></tr><tr><td class="iter">2</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>14 February 1985</td><td>→ 1980s</td></tr><tr><td class="iter">2</td><td>LOC</td><td>QUASI</td><td class="action generalize">generalize</td><td>London</td><td>→ Europe</td></tr><tr><td class="iter">2</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>2020</td><td>→ 2020s</td></tr></table>
       </details>
+    </div>
+    
+    <div class="example-card">
+      <div class="example-header">
+        <h2>Hospital incident report</h2>
+        <span class="pill">k_target=5 · iters=3</span>
+      </div>
+      <div class="sample-blurb">Admission incident with multiple QUASI mentions and an NHS number. Pro converges at level 1; the NHS number is caught by the regex pass even though off-the-shelf NER would never tag it.</div>
+      <div class="cols">
+        <div class="col">
+          <h3>Original</h3>
+          <div class="body">Patient incident report: Thomas Edwards, a 62-year-old male, was admitted to St Mary&#x27;s Hospital on 17 March 2025 with chest pain. NHS number 487 213 6890. Mr Edwards has a documented history of hypertension since 2014 and is a retired electrician living in Birmingham. He was discharged after three days under the care of Dr Lin.</div>
+        </div>
+        <div class="col">
+          <h3>Lite <span class="badge lite">DIRECT-only</span></h3>
+          <div class="body">Patient incident report: <span class="tag">[PERSON]</span>, a 62-year-old male, was admitted to <span class="tag">[ORG]</span> on 17 March 2025 with chest pain. NHS number <span class="tag">[CODE]</span>. <span class="tag">[PERSON]</span> has a documented history of hypertension since 2014 and is a retired electrician living in Birmingham. He was discharged after three days under the care of <span class="tag">[PERSON]</span>.</div>
+        </div>
+        <div class="col">
+          <h3>Pro <span class="badge pro">DIRECT + mosaic-aware QUASI</span></h3>
+          <div class="body">Patient incident report: <span class="tag">[PERSON]</span>, a about 60 male, was admitted to <span class="tag">[ORG]</span> on 2025 with chest pain. NHS number <span class="tag">[CODE]</span>. <span class="tag">[PERSON]</span> has a documented history of hypertension since 2014 and is a retired electrician living in United Kingdom. He was discharged after three days under the care of <span class="tag">[PERSON]</span>.</div>
+          <div class="mosaic">
+            <span class="k">k_initial = 1</span>
+            <span> → </span>
+            <span class="k">k_final = 6</span>
+            <span> · iterations: 1 · </span>
+            <span class="converged">✓ converged</span>
+          </div>
+        </div>
+      </div>
+      <details>
+        <summary>Pro audit log</summary>
+        <table class="audit-table"><tr><th>iter</th><th>type</th><th>role</th><th>action</th><th>original</th><th>replacement</th></tr><tr><td class="iter">0</td><td>PERSON</td><td>DIRECT</td><td class="action redact">redact</td><td>Thomas Edwards</td><td>→ [PERSON]</td></tr><tr><td class="iter">0</td><td>ORG</td><td>DIRECT</td><td class="action redact">redact</td><td>St Mary&#x27;s Hospital</td><td>→ [ORG]</td></tr><tr><td class="iter">0</td><td>CODE</td><td>DIRECT</td><td class="action redact">redact</td><td>487 213 6890</td><td>→ [CODE]</td></tr><tr><td class="iter">0</td><td>PERSON</td><td>DIRECT</td><td class="action redact">redact</td><td>Mr Edwards</td><td>→ [PERSON]</td></tr><tr><td class="iter">0</td><td>PERSON</td><td>DIRECT</td><td class="action redact">redact</td><td>Dr Lin</td><td>→ [PERSON]</td></tr><tr><td class="iter">1</td><td>QUANTITY</td><td>QUASI</td><td class="action generalize">generalize</td><td>62-year-old</td><td>→ about 60</td></tr><tr><td class="iter">1</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>17 March 2025</td><td>→ 2025</td></tr><tr><td class="iter">1</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>2014</td><td>→ 2014</td></tr><tr><td class="iter">1</td><td>LOC</td><td>QUASI</td><td class="action generalize">generalize</td><td>Birmingham</td><td>→ United Kingdom</td></tr></table>
+      </details>
+    </div>
+    
+    <div class="example-card">
+      <div class="example-header">
+        <h2>Insurance claim review</h2>
+        <span class="pill">k_target=5 · iters=3</span>
+      </div>
+      <div class="sample-blurb">Policyholder profile with DOB, role, hospital, and annual claim amount. Pro converges at level 2 because the joint profile is distinctive.</div>
+      <div class="cols">
+        <div class="col">
+          <h3>Original</h3>
+          <div class="body">Insurance claim review for Aisha Rahman, born 9 August 1979, currently employed as a teacher in Leeds. The claim relates to ongoing treatment at Leeds General Infirmary for a chronic condition diagnosed in 2022. Total annual claim: approximately £18,500. Ms Rahman has been a policyholder since 2012.</div>
+        </div>
+        <div class="col">
+          <h3>Lite <span class="badge lite">DIRECT-only</span></h3>
+          <div class="body">Insurance claim review for <span class="tag">[PERSON]</span>, born 9 August 1979, currently employed as a teacher in Leeds. The claim relates to ongoing treatment at <span class="tag">[ORG]</span> for a chronic condition diagnosed in 2022. Total annual claim: approximately £18,500. <span class="tag">[PERSON]</span> has been a policyholder since 2012.</div>
+        </div>
+        <div class="col">
+          <h3>Pro <span class="badge pro">DIRECT + mosaic-aware QUASI</span></h3>
+          <div class="body">Insurance claim review for <span class="tag">[PERSON]</span>, born 1970s, currently employed as a teacher in Europe. The claim relates to ongoing treatment at <span class="tag">[ORG]</span> for a chronic condition diagnosed in 2020s. Total annual claim: approximately <span class="tag">[QUANTITY]</span>. <span class="tag">[PERSON]</span> has been a policyholder since 2010s.</div>
+          <div class="mosaic">
+            <span class="k">k_initial = 1</span>
+            <span> → </span>
+            <span class="k">k_final = 6</span>
+            <span> · iterations: 2 · </span>
+            <span class="converged">✓ converged</span>
+          </div>
+        </div>
+      </div>
+      <details>
+        <summary>Pro audit log</summary>
+        <table class="audit-table"><tr><th>iter</th><th>type</th><th>role</th><th>action</th><th>original</th><th>replacement</th></tr><tr><td class="iter">0</td><td>PERSON</td><td>DIRECT</td><td class="action redact">redact</td><td>Aisha Rahman</td><td>→ [PERSON]</td></tr><tr><td class="iter">0</td><td>ORG</td><td>DIRECT</td><td class="action redact">redact</td><td>Leeds General Infirmary</td><td>→ [ORG]</td></tr><tr><td class="iter">0</td><td>PERSON</td><td>DIRECT</td><td class="action redact">redact</td><td>Ms Rahman</td><td>→ [PERSON]</td></tr><tr><td class="iter">1</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>9 August 1979</td><td>→ 1970s</td></tr><tr><td class="iter">1</td><td>LOC</td><td>QUASI</td><td class="action generalize">generalize</td><td>Leeds</td><td>→ Europe</td></tr><tr><td class="iter">1</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>2022</td><td>→ 2020s</td></tr><tr><td class="iter">1</td><td>QUANTITY</td><td>QUASI</td><td class="action generalize">generalize</td><td>£18,500</td><td>→ [QUANTITY]</td></tr><tr><td class="iter">1</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>2012</td><td>→ 2010s</td></tr><tr><td class="iter">2</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>9 August 1979</td><td>→ 1970s</td></tr><tr><td class="iter">2</td><td>LOC</td><td>QUASI</td><td class="action generalize">generalize</td><td>Leeds</td><td>→ Europe</td></tr><tr><td class="iter">2</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>2022</td><td>→ 2020s</td></tr><tr><td class="iter">2</td><td>QUANTITY</td><td>QUASI</td><td class="action generalize">generalize</td><td>£18,500</td><td>→ [QUANTITY]</td></tr><tr><td class="iter">2</td><td>DATETIME</td><td>QUASI</td><td class="action generalize">generalize</td><td>2012</td><td>→ 2010s</td></tr></table>
+      </details>
+    </div>
+    
+    </div>
+    
+    <div class="panel" id="panel4">
+      <div class="category-summary">Phase 4: instead of every PERSON becoming [PERSON], each distinct entity gets a stable referential token. The vault stays with the firm; the LLM only ever sees the tokens. After the LLM responds, the firm runs restore() locally to swap tokens for real names.</div>
+      
+    <div class="example-card">
+      <div class="example-header">
+        <h2>Multi-party contract dispute</h2>
+        <span class="pill">pseudonymise=True</span>
+      </div>
+      <div class="sample-blurb">Original Phase 4 demo — two distinct parties referenced by multiple surface forms each (&#x27;Maria Petrova&#x27;, &#x27;Mrs Petrova&#x27;, &#x27;Petrova&#x27;). Substring + honorific coref collapses each set to one token. Round-trip preserves the canonical form.</div>
+      <div class="cols">
+        <div class="col">
+          <h3>Original</h3>
+          <div class="body">Maria Petrova has filed a claim against Acme Holdings Ltd in the dispute concerning the contract dated 12 March 2018. Mrs Petrova, a Bulgarian national, alleges that John Smith, the company&#x27;s chief financial officer, breached his fiduciary duty. Acme denies all wrongdoing and is represented by Sofia District Court. Smith has not yet responded to the allegations, while Petrova continues to seek damages of approximately €450,000.</div>
+        </div>
+        <div class="col">
+          <h3>Pseudonymised <span class="badge pseudo">DIRECT → tokens</span></h3>
+          <div class="body">[PERSON_A] has filed a claim against [ORG_A] in the dispute concerning the contract dated 12 March 2018. [PERSON_A], a Bulgarian national, alleges that [PERSON_B], the company&#x27;s chief financial officer, breached his fiduciary duty. [ORG_A] denies all wrongdoing and is represented by [ORG_B]. [PERSON_B] has not yet responded to the allegations, while [PERSON_A] continues to seek damages of approximately €450,000.</div>
+        </div>
+        <div class="col">
+          <h3>Vault <span class="badge vault">stays with the firm</span></h3>
+          <table class="vault-table"><tr><th>token</th><th>original</th></tr><tr><td class="token">[PERSON_A]</td><td>→ Maria Petrova</td></tr><tr><td class="token">[ORG_A]</td><td>→ Acme Holdings Ltd</td></tr><tr><td class="token">[PERSON_B]</td><td>→ John Smith</td></tr><tr><td class="token">[ORG_B]</td><td>→ Sofia District Court</td></tr></table>
+        </div>
+      </div>
+      <div class="round-trip">
+        <h3>Round-trip — what the LLM workflow looks like</h3>
+        <div class="round-trip-step">
+          <div class="step-label">1. The firm sends the pseudonymised document + a question to a third-party LLM</div>
+          <div class="step-body">
+            <strong>Question:</strong> Who is suing whom, and what court is involved?
+          </div>
+        </div>
+        <div class="round-trip-step">
+          <div class="step-label">2. The LLM responds, still using only the opaque tokens</div>
+          <div class="step-body">Based on the redacted document, [PERSON_A] is suing [ORG_A] (represented by [ORG_B]) over a contract dispute. The defendants include [PERSON_B], the company&#x27;s CFO.</div>
+        </div>
+        <div class="round-trip-step">
+          <div class="step-label">3. The firm runs <code>restore(answer, vault)</code> locally</div>
+          <div class="step-body">Based on the redacted document, Maria Petrova is suing Acme Holdings Ltd (represented by Sofia District Court) over a contract dispute. The defendants include John Smith, the company&#x27;s CFO.</div>
+        </div>
+        <p class="round-trip-note">
+          The LLM never saw the real names. The restoration step is pure local
+          string replacement — no API call, no external dependency on the LLM
+          provider's logs or retention policy.
+        </p>
+      </div>
+    </div>
+    
+    <div class="example-card">
+      <div class="example-header">
+        <h2>HR investigation — three parties + tribunal</h2>
+        <span class="pill">pseudonymise=True</span>
+      </div>
+      <div class="sample-blurb">Internal HR document. Complainant, subject, and witness all distinct PERSONs. Mitchell is referenced two ways (&#x27;Sarah Mitchell&#x27; / surname only) and coreferred. The round-trip shows how an HR partner could ask an LLM structural questions about who reports to whom without exposing the names.</div>
+      <div class="cols">
+        <div class="col">
+          <h3>Original</h3>
+          <div class="body">HR investigation report. Complainant: Sarah Mitchell, Senior Engineer at Acme Holdings Ltd since 2019. Subject: Daniel Park, Engineering Manager. Mitchell alleges that Mr Park made discriminatory comments on 8 February 2025. Witness: Lisa Chen, Product Lead. Park has been employed by Acme since 2017 and reports to Sarah Mitchell&#x27;s skip-level. The matter is being handled internally before any escalation to the London Employment Tribunal.</div>
+        </div>
+        <div class="col">
+          <h3>Pseudonymised <span class="badge pseudo">DIRECT → tokens</span></h3>
+          <div class="body">HR investigation report. Complainant: [PERSON_A], Senior Engineer at [ORG_A] since 2019. Subject: [PERSON_B], Engineering Manager. [PERSON_A] alleges that [PERSON_B] made discriminatory comments on 8 February 2025. Witness: [PERSON_C], Product Lead. [PERSON_B] has been employed by [ORG_A] since 2017 and reports to [PERSON_A] [PERSON_A]&#x27;s skip-level. The matter is being handled internally before any escalation to the [ORG_B].</div>
+        </div>
+        <div class="col">
+          <h3>Vault <span class="badge vault">stays with the firm</span></h3>
+          <table class="vault-table"><tr><th>token</th><th>original</th></tr><tr><td class="token">[PERSON_A]</td><td>→ Sarah Mitchell</td></tr><tr><td class="token">[ORG_A]</td><td>→ Acme Holdings Ltd</td></tr><tr><td class="token">[PERSON_B]</td><td>→ Daniel Park</td></tr><tr><td class="token">[PERSON_C]</td><td>→ Lisa Chen</td></tr><tr><td class="token">[ORG_B]</td><td>→ London Employment Tribunal</td></tr></table>
+        </div>
+      </div>
+      <div class="round-trip">
+        <h3>Round-trip — what the LLM workflow looks like</h3>
+        <div class="round-trip-step">
+          <div class="step-label">1. The firm sends the pseudonymised document + a question to a third-party LLM</div>
+          <div class="step-body">
+            <strong>Question:</strong> Summarise the structure of the HR complaint — who reported what, against whom?
+          </div>
+        </div>
+        <div class="round-trip-step">
+          <div class="step-label">2. The LLM responds, still using only the opaque tokens</div>
+          <div class="step-body">[PERSON_A] (the complainant) has alleged that [PERSON_B] made discriminatory comments. [PERSON_C] is named as a witness. The matter is being handled by [ORG_A] before any escalation to [ORG_B].</div>
+        </div>
+        <div class="round-trip-step">
+          <div class="step-label">3. The firm runs <code>restore(answer, vault)</code> locally</div>
+          <div class="step-body">Sarah Mitchell (the complainant) has alleged that Daniel Park made discriminatory comments. Lisa Chen is named as a witness. The matter is being handled by Acme Holdings Ltd before any escalation to London Employment Tribunal.</div>
+        </div>
+        <p class="round-trip-note">
+          The LLM never saw the real names. The restoration step is pure local
+          string replacement — no API call, no external dependency on the LLM
+          provider's logs or retention policy.
+        </p>
+      </div>
+    </div>
+    
+    <div class="example-card">
+      <div class="example-header">
+        <h2>Class action — five plaintiffs + letter rollover</h2>
+        <span class="pill">pseudonymise=True</span>
+      </div>
+      <div class="sample-blurb">Five distinct plaintiffs, each named twice. Demonstrates the [PERSON_A]..[PERSON_E] sequence and the letter rollover behaviour. Useful for portfolio audiences who want to see the pseudonymiser handle non-trivial fan-out.</div>
+      <div class="cols">
+        <div class="col">
+          <h3>Original</h3>
+          <div class="body">Class action claim filed on 4 March 2025 against MegaCorp International. Lead plaintiffs: Robert Anderson, Yuki Tanaka, Priya Sharma, Carlos Mendez, and Nina Petrov. The action concerns unpaid overtime for warehouse staff at MegaCorp&#x27;s distribution centre in Birmingham between 2021 and 2024. Anderson, Tanaka, Sharma, Mendez, and Petrov each seek damages of approximately £35,000. MegaCorp is represented by Bishop &amp; Wright LLP.</div>
+        </div>
+        <div class="col">
+          <h3>Pseudonymised <span class="badge pseudo">DIRECT → tokens</span></h3>
+          <div class="body">Class action claim filed on 4 March 2025 against [ORG_A]. Lead plaintiffs: [PERSON_A], [PERSON_B], [PERSON_C], [PERSON_D], and [PERSON_E]. The action concerns unpaid overtime for warehouse staff at [ORG_A]&#x27;s distribution centre in Birmingham between 2021 and 2024. [PERSON_A], [PERSON_B], [PERSON_C], [PERSON_D], and [PERSON_E] each seek damages of approximately £35,000. [ORG_A] is represented by [ORG_B].</div>
+        </div>
+        <div class="col">
+          <h3>Vault <span class="badge vault">stays with the firm</span></h3>
+          <table class="vault-table"><tr><th>token</th><th>original</th></tr><tr><td class="token">[ORG_A]</td><td>→ MegaCorp International</td></tr><tr><td class="token">[PERSON_A]</td><td>→ Robert Anderson</td></tr><tr><td class="token">[PERSON_B]</td><td>→ Yuki Tanaka</td></tr><tr><td class="token">[PERSON_C]</td><td>→ Priya Sharma</td></tr><tr><td class="token">[PERSON_D]</td><td>→ Carlos Mendez</td></tr><tr><td class="token">[PERSON_E]</td><td>→ Nina Petrov</td></tr><tr><td class="token">[ORG_B]</td><td>→ Bishop &amp; Wright LLP</td></tr></table>
+        </div>
+      </div>
+      <div class="round-trip">
+        <h3>Round-trip — what the LLM workflow looks like</h3>
+        <div class="round-trip-step">
+          <div class="step-label">1. The firm sends the pseudonymised document + a question to a third-party LLM</div>
+          <div class="step-body">
+            <strong>Question:</strong> How many plaintiffs are there, and which firm represents the defendant?
+          </div>
+        </div>
+        <div class="round-trip-step">
+          <div class="step-label">2. The LLM responds, still using only the opaque tokens</div>
+          <div class="step-body">There are five lead plaintiffs: [PERSON_A], [PERSON_B], [PERSON_C], [PERSON_D], and [PERSON_E]. The defendant [ORG_A] is represented by [ORG_B].</div>
+        </div>
+        <div class="round-trip-step">
+          <div class="step-label">3. The firm runs <code>restore(answer, vault)</code> locally</div>
+          <div class="step-body">There are five lead plaintiffs: Robert Anderson, Yuki Tanaka, Priya Sharma, Carlos Mendez, and Nina Petrov. The defendant MegaCorp International is represented by Bishop &amp; Wright LLP.</div>
+        </div>
+        <p class="round-trip-note">
+          The LLM never saw the real names. The restoration step is pure local
+          string replacement — no API call, no external dependency on the LLM
+          provider's logs or retention policy.
+        </p>
+      </div>
+    </div>
+    
     </div>
     
   </div>

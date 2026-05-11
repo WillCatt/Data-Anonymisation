@@ -3,11 +3,18 @@ Command-line entry point.
 
 Usage
 -----
+    # Redact (Lite or Pro)
     python -m anonymisation.cli redact \\
         --variant {lite|pro} \\
         [--ner spacy|hf|finetuned] \\
         [--k-target 5] [--max-iterations 5] \\
+        [--pseudonymise] [--vault-out PATH] \\
         [--json] [--mosaic-haystack tab] \\
+        FILE
+
+    # Round-trip an LLM answer back through the pseudonym vault
+    python -m anonymisation.cli restore \\
+        --vault PATH \\
         FILE
 
 The defaults pick spaCy as the NER provider so the CLI runs out of the box
@@ -22,7 +29,7 @@ import sys
 from pathlib import Path
 from typing import List, Tuple
 
-from .pipeline import LitePipeline, MosaicScorer, ProPipeline
+from .pipeline import LitePipeline, MosaicScorer, ProPipeline, restore
 
 
 # -----------------------------------------------------------------------
@@ -107,7 +114,12 @@ def cmd_redact(args: argparse.Namespace) -> int:
     ner = build_ner_provider(args.ner, args.ner_model)
 
     if args.variant == "lite":
-        pipeline = LitePipeline(ner_provider=ner, run_regex=not args.no_regex)
+        pipeline = LitePipeline(
+            ner_provider=ner,
+            run_regex=not args.no_regex,
+            coref_extend=not args.no_coref,
+            pseudonymise=args.pseudonymise,
+        )
     else:
         scorer = build_scorer(args.mosaic_haystack)
         pipeline = ProPipeline(
@@ -116,6 +128,8 @@ def cmd_redact(args: argparse.Namespace) -> int:
             k_target=args.k_target,
             max_iterations=args.max_iterations,
             run_regex=not args.no_regex,
+            coref_extend=not args.no_coref,
+            pseudonymise=args.pseudonymise,
         )
 
     result = pipeline(text)
@@ -132,6 +146,32 @@ def cmd_redact(args: argparse.Namespace) -> int:
                 f"converged={result.converged})",
                 file=sys.stderr,
             )
+
+    # Persist the pseudonym vault if asked
+    if args.pseudonymise and args.vault_out:
+        Path(args.vault_out).write_text(
+            json.dumps(result.pseudonym_vault, indent=2, ensure_ascii=False)
+        )
+        print(
+            f"# pseudonym vault written to {args.vault_out} "
+            f"({len(result.pseudonym_vault)} entries)",
+            file=sys.stderr,
+        )
+    elif args.pseudonymise and not args.json:
+        # No file specified — emit vault on stderr so stdout stays clean
+        print("\n# pseudonym vault:", file=sys.stderr)
+        for token, original in result.pseudonym_vault.items():
+            print(f"#   {token} -> {original!r}", file=sys.stderr)
+    return 0
+
+
+def cmd_restore(args: argparse.Namespace) -> int:
+    """Take a pseudonymised text + vault and restore the original surface forms."""
+    text = sys.stdin.read() if args.file == "-" else Path(args.file).read_text()
+    vault = json.loads(Path(args.vault).read_text())
+    if not isinstance(vault, dict):
+        raise SystemExit(f"vault file {args.vault} did not parse as a JSON object")
+    print(restore(text, vault), end="")
     return 0
 
 
@@ -150,17 +190,37 @@ def main(argv: list[str] | None = None) -> int:
                           help="Model name or path. Defaults to en_core_web_trf for spacy.")
     p_redact.add_argument("--no-regex", action="store_true",
                           help="Disable the regex post-pass.")
+    p_redact.add_argument("--no-coref", action="store_true",
+                          help="Disable the coreference extension pass (Phase 5).")
     p_redact.add_argument("--k-target", type=int, default=5,
                           help="Pro only: target k-anonymity (default 5).")
     p_redact.add_argument("--max-iterations", type=int, default=5,
                           help="Pro only: max generalization iterations (default 5).")
     p_redact.add_argument("--mosaic-haystack", choices=["tab", "empty"], default="tab",
                           help="Pro only: source of the mosaic comparison corpus.")
+    p_redact.add_argument("--pseudonymise", "--pseudonymize", action="store_true",
+                          help=("Use referential tokens ([PERSON_A], [PERSON_B], …) "
+                                "instead of plain [TYPE] tags. Pair with --vault-out "
+                                "to save the mapping for round-trip restore."))
+    p_redact.add_argument("--vault-out", default=None,
+                          help="Path to write the pseudonym vault as JSON. Implies --pseudonymise.")
     p_redact.add_argument("--json", action="store_true",
                           help="Output the full audit log as JSON instead of just the text.")
     p_redact.set_defaults(func=cmd_redact)
 
+    p_restore = sub.add_parser(
+        "restore",
+        help="Round-trip a pseudonymised text back to original surface forms.",
+    )
+    p_restore.add_argument("file", help="Path to redacted text, or '-' for stdin")
+    p_restore.add_argument("--vault", required=True,
+                           help="Path to the pseudonym vault JSON produced by `redact --pseudonymise`.")
+    p_restore.set_defaults(func=cmd_restore)
+
     args = parser.parse_args(argv)
+    # If --vault-out is set, --pseudonymise is implied
+    if hasattr(args, "vault_out") and args.vault_out and not args.pseudonymise:
+        args.pseudonymise = True
     return args.func(args)
 
 

@@ -20,7 +20,7 @@ from typing import List, Literal, Optional
 
 
 IdentifierRole = Literal["DIRECT", "QUASI"]
-DetectorSource = Literal["ner", "regex", "manual"]
+DetectorSource = Literal["ner", "regex", "manual", "coref"]
 
 
 @dataclass
@@ -61,6 +61,11 @@ class RedactionResult:
     iterations_used: int = 0
     converged: bool = True  # False if max iterations hit before reaching k_target
 
+    # Pseudonymisation (when pipeline was run with pseudonymise=True). Empty
+    # otherwise. Maps tokens like "[PERSON_A]" → original surface form.
+    # Suitable for JSON serialisation; pair with `restore()` to round-trip.
+    pseudonym_vault: dict = field(default_factory=dict)
+
     # Convenience for serialisation
     def to_dict(self) -> dict:
         return {
@@ -89,4 +94,5 @@ class RedactionResult:
             "mosaic_risk_final": self.mosaic_risk_final,
             "iterations_used": self.iterations_used,
             "converged": self.converged,
+            "pseudonym_vault": self.pseudonym_vault,
         }

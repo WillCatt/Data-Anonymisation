@@ -44,7 +44,10 @@ def _generalize_datetime(text: str, level: int) -> str:
 # ---------------------------------------------------------------------------
 # QUANTITY — primarily ages; round, then decade-band
 # ---------------------------------------------------------------------------
-_NUM_RE = re.compile(r"-?\d+")
+# Match comma-separated numbers ("2,300,000") preferentially, falling back to
+# bare digit runs. Without this the previous version saw "£2,300,000" as the
+# number 2 and routed it through the age heuristic.
+_NUM_RE = re.compile(r"-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?")
 
 
 def _generalize_quantity(text: str, level: int) -> str:
@@ -53,27 +56,38 @@ def _generalize_quantity(text: str, level: int) -> str:
     m = _NUM_RE.search(text)
     if not m:
         return "[QUANTITY]"
-    n = int(m.group())
+    n_str = m.group().replace(",", "")
+    try:
+        n = int(float(n_str))
+    except ValueError:
+        return "[QUANTITY]"
 
-    # Heuristic: human ages live in 0..120; treat anything else as a non-age quantity
-    if 0 <= n <= 120 and ("year" in text.lower() or "old" in text.lower() or n <= 100):
+    # Age heuristic: number must be plausible AND the surrounding text must
+    # reference age explicitly. This avoids treating "£18,500" as someone's age.
+    is_age = (0 <= n <= 120) and (
+        "year" in text.lower() or "old" in text.lower()
+    )
+
+    if is_age:
         if level == 1:
             rounded = (n // 10) * 10
             return f"about {rounded}"
         if level == 2:
             band = (n // 10) * 10
             return f"in their {band}s" if band >= 20 else f"under {band + 10}"
-    # Generic numeric quantity
+
+    # Generic numeric quantity (currency, weights, durations)
     if level == 1:
-        if n >= 1000:
-            base = (n // 1000) * 1000
+        if n >= 1_000_000:
+            base = (n // 1_000_000) * 1_000_000
+            return f"about {base:,}"
+        if n >= 1_000:
+            base = (n // 1_000) * 1_000
             return f"about {base:,}"
         if n >= 100:
             base = (n // 100) * 100
             return f"about {base}"
         return f"about {(n // 10) * 10}"
-    if level == 2:
-        return "[QUANTITY]"
     return "[QUANTITY]"
 
 
@@ -93,6 +107,9 @@ _CITY_TO_COUNTRY = {
     "rome": "Italy", "milan": "Italy",
     "paris": "France", "lyon": "France",
     "london": "United Kingdom", "manchester": "United Kingdom",
+    "edinburgh": "United Kingdom", "birmingham": "United Kingdom",
+    "leeds": "United Kingdom", "glasgow": "United Kingdom",
+    "liverpool": "United Kingdom", "bristol": "United Kingdom",
     "berlin": "Germany", "munich": "Germany",
     "madrid": "Spain", "barcelona": "Spain",
     "lisbon": "Portugal",

@@ -27,6 +27,7 @@ from typing import List, Optional, Tuple
 
 from .base import Pipeline
 from .generalization import MAX_LEVEL, generalize
+from .pseudonymise import Pseudonymiser
 from .scorer import MosaicScorer
 from .types import AuditEntry, RedactionResult, Span
 
@@ -41,30 +42,40 @@ class ProPipeline(Pipeline):
         *,
         k_target: int = 5,
         max_iterations: int = 5,
+        pseudonymise: bool = False,
         **kwargs,
     ):
         super().__init__(ner_provider, **kwargs)
         self.scorer = scorer or MosaicScorer.empty()
         self.k_target = k_target
         self.max_iterations = max_iterations
+        self.pseudonymise = pseudonymise
 
     # ------------------------------------------------------------------ #
     def _redact(self, text: str) -> RedactionResult:
         spans = self.detect_spans(text)
         audit: List[AuditEntry] = []
+        pseudo: Optional[Pseudonymiser] = (
+            Pseudonymiser() if self.pseudonymise else None
+        )
 
         # Phase A — suppress every DIRECT span unconditionally
         direct_spans = [s for s in spans if s.identifier_role == "DIRECT"]
         quasi_spans = [s for s in spans if s.identifier_role == "QUASI"]
 
         for s in direct_spans:
-            s.replacement = f"[{s.entity_type}]"
+            if pseudo is not None:
+                s.replacement = pseudo.token_for(s.entity_type, s.text)
+                rationale = (
+                    f"DIRECT identifier ({s.entity_type}); pseudonymised to "
+                    f"{s.replacement} (vault holds the original)."
+                )
+            else:
+                s.replacement = f"[{s.entity_type}]"
+                rationale = f"DIRECT identifier ({s.entity_type}); always suppressed."
             s.generalization_level = MAX_LEVEL
             audit.append(AuditEntry(
-                span=s,
-                action="redact",
-                rationale=f"DIRECT identifier ({s.entity_type}); always suppressed.",
-                iteration=0,
+                span=s, action="redact", rationale=rationale, iteration=0,
             ))
 
         # Phase B — score the initial fingerprint (after DIRECTs gone)
@@ -88,6 +99,7 @@ class ProPipeline(Pipeline):
                 redacted_text=redacted_text, spans=spans, audit=audit,
                 mosaic_risk_initial=initial_k, mosaic_risk_final=initial_k,
                 iterations_used=0, converged=True,
+                pseudonym_vault=(pseudo.vault if pseudo is not None else {}),
             )
 
         # Phase C — iterate-until-safe
@@ -139,13 +151,24 @@ class ProPipeline(Pipeline):
                     ))
             sig = self._signature_from_quasi(quasi_spans)
             current_k = self.scorer.k_for(sig)
-            converged = current_k >= self.k_target
+            # `converged` stays False — once we've fallen back to full
+            # suppression we have not "converged" in the natural sense, even
+            # though the empty signature trivially satisfies k_target. The
+            # caller distinguishes the two cases on the converged flag.
+
+        # Final semantic check: if every QUASI ended up at MAX_LEVEL, this
+        # is full suppression regardless of whether it happened inside the
+        # iterate loop (k_target trivially satisfied by an empty signature)
+        # or via the explicit Phase D fallback. Either way, not "converged".
+        if quasi_spans and all(s.generalization_level >= MAX_LEVEL for s in quasi_spans):
+            converged = False
 
         redacted_text = self.apply_replacements(text, spans)
         return RedactionResult(
             redacted_text=redacted_text, spans=spans, audit=audit,
             mosaic_risk_initial=initial_k, mosaic_risk_final=current_k,
             iterations_used=iterations_used, converged=converged,
+            pseudonym_vault=(pseudo.vault if pseudo is not None else {}),
         )
 
     # ------------------------------------------------------------------ #

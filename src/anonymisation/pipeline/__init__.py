@@ -25,6 +25,8 @@ from .types import AuditEntry, RedactionResult, Span
 from .roles import classify_role, DEFAULT_ROLE_BY_TYPE
 from .regex_pass import regex_pass
 from .generalization import generalize, MAX_LEVEL
+from .pseudonymise import Pseudonymiser, restore, index_to_letters
+from .coref import extend_with_coref
 
 __all__ = [
     "Pipeline", "LitePipeline", "ProPipeline",
@@ -33,4 +35,6 @@ __all__ = [
     "Span", "AuditEntry", "RedactionResult",
     "classify_role", "DEFAULT_ROLE_BY_TYPE",
     "regex_pass", "generalize", "MAX_LEVEL",
+    "Pseudonymiser", "restore", "index_to_letters",
+    "extend_with_coref",
 ]

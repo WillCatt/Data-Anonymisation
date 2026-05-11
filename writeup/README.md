@@ -26,7 +26,9 @@ I structured this as a project a firm could plausibly commission, in three phase
 |---|---|---|
 | **1 — Proof of concept** | How big is the off-the-shelf gap? Can we measure where it leaks? Is the residual *mosaic* risk something the buyer needs to worry about? | ✅ Built |
 | **2 — Baseline comparison + fine-tune** | How much of the gap closes if we compare alternative models, and if we fine-tune on legal data? | 🟡 Code complete, runs pending |
-| **3 — Production pipeline** | What does the actual deployable thing look like? Two-variant package (Lite vs Pro) + CLI + Gradio demo. | ✅ Built (demo deploy pending) |
+| **3 — Production pipeline** | What does the actual deployable thing look like? Two-variant package (Lite vs Pro) + CLI + static showcase. | ✅ Built |
+| **4 — Pseudonymisation + round-trip** | How does the firm get a *useful* answer back from an LLM run on a redacted document? Referential tokens (PERSON_A / PERSON_B), local vault, restore() helper. | ✅ Built |
+| **5 — Coreference-aware extension** | Off-the-shelf NER tags `Northwind Energy Ltd` on the first mention but leaks the bare `Northwind` references afterwards. Phase 5 closes that gap with a deterministic post-processor evaluated against TAB. | ✅ Built |
 
 This writeup focuses on Phase 1 — what's built, what it found, what it implies. Phase 2 and 3 are scoped in `phase2_baseline_comparison/README.md` and `phase3_pipeline/README.md` in the repo.
 
@@ -166,6 +168,93 @@ Out of scope, deliberately, and called out in the audit so a reader knows:
 - **PDF / DOCX extraction** — the test inputs are plain text. A real deployment would prepend a `pdfplumber` / `python-docx` step.
 - **Active learning / human-in-the-loop UI** — the audit log makes this *possible* (a paralegal can review every decision and correct mistakes), but the workflow tooling around that audit isn't built.
 - **Network-isolated deployment** — the pipeline is pure Python with no external API calls, so it can run on-prem in principle, but a real Docker / Kubernetes packaging hasn't been done.
+
+---
+
+## Phase 4 — Pseudonymisation: making redacted documents *useful*
+
+Phase 3 keeps the firm's privileged data out of the LLM provider's hands. But running it as written has a downstream cost: the redacted document is *less useful* to the LLM. After Lite, the same passage:
+
+> *"Maria Petrova sued John Doe over breach of the Acme contract"*
+
+becomes:
+
+> *"[PERSON] sued [PERSON] over breach of the [ORG] contract"*
+
+A model asked "who is suing whom?" can no longer answer. Three `[PERSON]`s look identical to it.
+
+**Phase 4 fixes this without giving up the privacy property.** The pipelines now support a `pseudonymise=True` flag. Instead of every PERSON becoming `[PERSON]`, each *distinct* surface form gets a stable referential token: `[PERSON_A]`, `[PERSON_B]`, `[PERSON_C]`. Same surface form gets the same token within the document; different surface forms (after a coreference check) get different tokens. The mapping between tokens and original names is held by the firm in a *vault* — a small dict that never leaves the firm's network.
+
+After pseudonymisation:
+
+> *"[PERSON_A] sued [PERSON_B] over breach of the [ORG_A] contract"*
+
+A downstream LLM can now answer "who sued whom?" coherently — "PERSON_A sued PERSON_B" — without ever seeing real names. The firm runs `restore(answer, vault)` locally on the LLM's response and gets back "Maria Petrova sued John Doe".
+
+### The round-trip workflow
+
+1. **Redact + pseudonymise** the document. Hold the vault locally.
+2. **Send the redacted document + a question** to the LLM. The LLM only ever sees opaque tokens.
+3. The LLM **responds, still using the tokens** (because that's all it has to work with).
+4. **Restore locally.** The firm runs `restore(answer, vault)` — pure local string replacement, no API call, no external dependency.
+
+The LLM provider's logs, retention policies, and model training pipeline never see real client names. The mapping is the secret, and it stays with the firm. This is the same pattern HIPAA Safe Harbor uses for clinical de-identification, and it's the pattern that makes "cloud LLMs on confidential data" defensible at all.
+
+### Coreference — the substring rule
+
+The hard part is recognising that "Maria Petrova", "Mrs Petrova", and "Petrova" all refer to the same person. The implementation uses a deliberately simple rule: two surface forms collapse to the same token if one appears, as whole words, inside the other (and they share an entity type). It's fast, predictable, and handles the common cases of legal documents well — formal introduction by full name followed by surname-only references throughout the text. It will misfire on coincidentally-shared surnames (two "Smith"s referring to different people in the same document); a real deployment would drop in a proper coref model where that matters.
+
+### Why DIRECTs only?
+
+Phase 4 only pseudonymises DIRECT identifiers. QUASI generalisation in Pro mode stays unchanged — places get broadened to regions, ages get banded, dates get truncated to year/decade. This is intentional: pseudonymising QUASIs would *preserve* their identifying joint distribution under stable tokens, which is exactly what the mosaic loop is trying to break. The two techniques would fight each other.
+
+### Caveats
+
+- **Per-document scope.** Each `Pseudonymiser` instance is independent. Cross-document persistence is straightforward to add but raises real key-management questions (where does the registry live? who can read it? what's the rotation policy?).
+- **Vault is sensitive.** The CLI writes it to plain JSON because that's appropriate for a portfolio demo. In production it should be encrypted at rest and treated as a session key.
+- **Coref is heuristic.** Substring rule only. Drop in a proper coref model where the trade-off matters.
+
+The static showcase has a **Sample 4** panel (`demo/index.html`) that walks through the full round-trip end-to-end on a multi-party contract dispute, with the LLM step simulated.
+
+---
+
+## Phase 5 — Coreference: the missed shorthand
+
+Building out the showcase examples surfaced a recall failure that doesn't show up in the Phase 1/2 span-F1 numbers but which a buyer would absolutely notice: off-the-shelf NER reliably catches the *first full mention* of a party (`Maria Petrova`, `Northwind Energy Ltd`) but leaks the shorthand mentions that follow (`Maria`, `Mrs Petrova`, `Northwind`). From a redaction standpoint, the misses are not minor — every shorthand reference is just as identifying as the first.
+
+The fix is structural rather than statistical: **a deterministic post-processor that runs after NER + regex**. For every PERSON or ORG span the model found, it generates likely coreferring shorter forms (surname alone, first-name alone, honorific + surname for PERSON; first significant word for ORG) and scans the rest of the document for word-aligned matches. Any match that doesn't overlap an existing span gets added with `source="coref"` and the parent's entity type. Pipeline integration is a single flag (`coref_extend=True`, defaulting to enabled).
+
+### Why this works in legal text specifically
+
+Legal documents have a very repeatable structure: a party is introduced in full early on, then referenced by a stable shorthand for the rest of the document. That makes a substring-based heuristic unusually effective here. Newswire English has more pronoun-driven coreference (`she`, `they`, `the company`), where the substring rule wouldn't help — but that's not the domain TAB or a law firm's matter data lives in.
+
+### Defensive choices in the implementation
+
+A few things to mention because they're load-bearing in production:
+
+- **`Sofia District Court` generates `Sofia District` (two-word prefix), not `Sofia` alone.** The bare first word is excluded because it could refer to the city of Sofia rather than the court. False-positive risk vs missed-match risk, deliberately erring toward missed matches for ambiguous head-words.
+- **Generic ORG suffixes never become standalone candidates.** `Ltd`, `Inc`, `Holdings`, `Corp`, `International`, `Group`, plus common legal-doc role words (`court`, `tribunal`, `commission`, `agency`) — none of these will fire as a coref candidate.
+- **Coref spans get `confidence=0.7`**, lower than direct NER. A downstream consumer that wants to be paranoid can filter by confidence.
+- **`coref_extend` is a flag, not a hard-coded behaviour.** Defaults on, but the CLI exposes `--no-coref` and the Pipeline constructors accept `coref_extend=False`. The Phase 1/2 numbers in this writeup were generated *without* coref to keep them comparable to the original baselines.
+
+### How to measure it — the right evaluation
+
+TAB happens to be perfect for this measurement: every gold annotation has an `entity_id` linking coreferring mentions back to a canonical entity. So we can compute **mention-recall per entity** — for each gold entity, what fraction of its mentions did the pipeline catch?
+
+The script `phase5_coreference/evaluate_mention_recall.py` runs this evaluation. It reports two numbers for both baseline and coref-enabled variants:
+
+- **Micro recall** — total mentions caught ÷ total gold mentions. Weights every mention equally.
+- **Macro recall** — mean recall per entity. Weights every entity equally regardless of how many times it appears.
+
+The expected pattern: PERSON and ORG recall jumps; DATETIME, QUANTITY, DEM, CODE barely move because those entities rarely have coref structure. The full run (~8 minutes on `en_core_web_trf`) generates a CSV of per-entity numbers and a summary JSON suitable for embedding the lift figure in this writeup.
+
+### What this phase does NOT do
+
+- **No pronoun resolution.** "She", "he", "they", "the company" — substring rule can't help. Off-the-shelf `fastcoref` or `spacy-coref` is the right next step, sketched in the walkthrough notebook.
+- **No retraining.** First-mention recall (where the Phase 2 fine-tune helps) is unchanged. This phase only improves subsequent-mention recall.
+- **Will misfire on coincidentally-shared surnames.** Two different "Smith"s in the same document collapse to one token. A proper coref model would distinguish them.
+
+The honest summary: with a few hours of work and no GPU time, mention-recall on TAB jumps measurably without breaking anything earlier. The walkthrough notebook explores the failure modes openly so a reader sees where the heuristic stops working — which is where Phase 5.1 (a real coref model) would start.
 
 ---
 
