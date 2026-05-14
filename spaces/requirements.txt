@@ -1,0 +1,12 @@
+# HuggingFace Spaces — pinned to versions known to coexist cleanly.
+# The gradio dep tree historically conflicts with spaCy 3.7 if left
+# unpinned (typer + huggingface-hub versions). These are the safe ones.
+
+gradio>=4.20.0,<5.0.0
+huggingface-hub>=0.19.0,<0.27.0
+typer>=0.3.0,<0.10.0
+spacy==3.7.4
+
+# Dataset loading for the mosaic scorer
+datasets==2.18.0
+pandas>=2.0.0

@@ -1,0 +1,27 @@
+# Dedicated requirements for the local Gradio demo.
+#
+# The main repo venv uses spaCy 3.7, transformers 4.40+, and recent
+# huggingface-hub — all of which conflict with newer Gradio releases.
+# This file pins a set of versions known to coexist cleanly so you can
+# run the Gradio demo in its own venv without touching the main one.
+#
+# Bootstrap with `demo/run_gradio.sh`.
+
+# Gradio 4.x — the line our demo/app.py was written against.
+# 5.x and 6.x have API-breaking changes (Textbox kwargs, theme location).
+gradio>=4.20.0,<5.0.0
+
+# huggingface_hub — Gradio 4.x imports HfFolder which was removed in 0.27.
+huggingface-hub>=0.19.0,<0.27.0
+
+# Typer pin — spaCy 3.7 requires typer<0.10. Newer Gradio installs pulled
+# in typer 0.25 which breaks `python -m spacy download`. Pin it back.
+typer>=0.3.0,<0.10.0
+
+# spaCy for the NER backbone. Pin to the main-venv version so any model
+# we've already downloaded works without re-downloading.
+spacy==3.7.4
+
+# Dataset loading for the mosaic scorer (Phase 3 Pro pipeline).
+datasets==2.18.0
+pandas>=2.0.0

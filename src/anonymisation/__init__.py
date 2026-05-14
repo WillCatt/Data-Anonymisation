@@ -46,8 +46,9 @@ __all__ = [
     "k_anonymity_table",
 ]
 
-# --- Phase 2 modules are imported lazily to keep Phase-1-only installs working ---
+# --- Phase 2+ modules are imported lazily to keep Phase-1-only installs working ---
 # Use them via:
 #     from anonymisation.predictors import make_hf_predictor, ...
 #     from anonymisation.iob import BIO_LABELS, offsets_to_bio, bio_to_spans
 #     from anonymisation.device import best_device, report_device
+#     from anonymisation.ensemble import EnsemblePredictor   # Phase 6

@@ -2,6 +2,10 @@
 
 *A portfolio project on PII redaction with NLP, built around the [Text Anonymization Benchmark](https://github.com/NorskRegnesentral/text-anonymization-benchmark).*
 
+![Performance summary across phases](../figures/phase_summary.png)
+
+> **Headline result:** the off-the-shelf baseline scores **F1 = 0.566** on TAB test. After Phase 2 fine-tuning, **F1 = 0.851** — a 28.5-percentage-point lift. Phases 3–5 then add the *engineering* around the model (two-variant pipeline, mosaic-aware QUASI generalisation, referential pseudonymisation, coref-aware extension) without retraining anything.
+
 ---
 
 ## The premise
@@ -29,6 +33,7 @@ I structured this as a project a firm could plausibly commission, in three phase
 | **3 — Production pipeline** | What does the actual deployable thing look like? Two-variant package (Lite vs Pro) + CLI + static showcase. | ✅ Built |
 | **4 — Pseudonymisation + round-trip** | How does the firm get a *useful* answer back from an LLM run on a redacted document? Referential tokens (PERSON_A / PERSON_B), local vault, restore() helper. | ✅ Built |
 | **5 — Coreference-aware extension** | Off-the-shelf NER tags `Northwind Energy Ltd` on the first mention but leaks the bare `Northwind` references afterwards. Phase 5 closes that gap with a deterministic post-processor evaluated against TAB. | ✅ Built |
+| **6 — Domain backbone + ensemble** | Does a legal-domain-pretrained backbone beat general-purpose RoBERTa? Does an ensemble of three independent predictors beat the best single one? Two predictable wins from the NER literature, applied to the same TAB evaluation. | 🟡 Code complete, runs pending |
 
 This writeup focuses on Phase 1 — what's built, what it found, what it implies. Phase 2 and 3 are scoped in `phase2_baseline_comparison/README.md` and `phase3_pipeline/README.md` in the repo.
 
@@ -255,6 +260,54 @@ The expected pattern: PERSON and ORG recall jumps; DATETIME, QUANTITY, DEM, CODE
 - **Will misfire on coincidentally-shared surnames.** Two different "Smith"s in the same document collapse to one token. A proper coref model would distinguish them.
 
 The honest summary: with a few hours of work and no GPU time, mention-recall on TAB jumps measurably without breaking anything earlier. The walkthrough notebook explores the failure modes openly so a reader sees where the heuristic stops working — which is where Phase 5.1 (a real coref model) would start.
+
+---
+
+## Phase 6 — Dialling in the model: domain backbone + ensemble
+
+After Phase 5 closed the obvious post-processing gap, the remaining quality work was on the model itself. Two well-known wins from the NER literature, neither of which we'd tested against TAB yet:
+
+### LegalBERT backbone
+
+Phase 2 fine-tuned `roberta-base`. RoBERTa was pre-trained on web crawl and books — general-purpose English. The natural follow-up: would a backbone *pre-trained on legal text* do better? [`nlpaueb/legal-bert-base-uncased`](https://huggingface.co/nlpaueb/legal-bert-base-uncased) is BERT-base pre-trained on 12 GB of US court cases, EU legislation, and contracts. Same architecture class, different training corpus.
+
+The Phase 6 recipe in `phase6_advanced_training/notebooks/01_legalbert_finetune.ipynb` is a near-verbatim copy of Phase 2's fine-tune notebook — same epochs, same learning rate, same evaluation — with only the `BASE_MODEL` variable changed. That makes the head-to-head fair.
+
+Expected lift: 1–3 F1 on legal-specific labels (PERSON, ORG, MISC). Marginal on domain-agnostic ones (DATETIME, QUANTITY). The actual numbers land in `phase6_advanced_training/results/legalbert_results.csv` after the run.
+
+### Three-way ensemble with voting
+
+The single most reliable improvement in NER is usually an ensemble. The members need to be *diverse* — making different mistakes — so their errors average out.
+
+Phase 6's ensemble combines:
+
+- **spaCy `en_core_web_trf`** — strong, general-purpose, OntoNotes-trained. The Phase 1 anchor.
+- **LegalBERT fine-tuned on TAB** — legal-domain-specific, produced by Notebook 01.
+- **Microsoft Presidio + custom CASE_NUMBER recogniser** — NER + regex hybrid; closes the CODE gap that pure NER can't.
+
+The implementation lives in `src/anonymisation/ensemble.py`. Each predictor runs independently; their spans get grouped by character-offset overlap (transitive — A overlaps B, B overlaps C → one group); within each group we vote on the entity type and keep the longest span of the winning type. A `min_votes` parameter controls the precision/recall trade-off — `1` (default) is the recall-maximising union, `2` is intersection-like, `3` is strict consensus.
+
+The ensemble drops into the existing `evaluate_document` framework with no other changes, so the F1 numbers compare directly to every other model in the project.
+
+### Predictions to test against the actual numbers
+
+I wrote these down before running anything — having explicit hypotheses sharpens the analysis after the fact:
+
+1. **LegalBERT beats RoBERTa on PERSON, ORG, and MISC by 1–3 F1.** Domain pretraining helps where the corpus differs from web English most.
+2. **LegalBERT is a wash on DATETIME and QUANTITY.** Those formats are universal.
+3. **The ensemble beats every single member on most labels.** That's the headline.
+4. **The ensemble does *not* dominate on every single label.** Usually one specialist beats the ensemble on its strong suit — CODE (Presidio alone), DEM (LegalBERT alone with no noise from other members). That's expected and worth pointing out.
+5. **`min_votes=2` trades 5–10 points of recall for 3–5 points of precision.** Useful operating point if false positives are a real cost (which they are for an audit-heavy redaction pipeline).
+
+If any of these predictions don't hold, the deviation is the interesting result — that's where the next investigation starts.
+
+### What Phase 6 does NOT do
+
+- **No CRF head.** Adding a Conditional Random Field on top of the token-classification output reduces boundary errors and closes the partial/exact-match F1 gap. Scoped as Phase 6.1.
+- **No coref-augmented fine-tuning.** Phase 5's post-processor catches shorthand at inference time; the deeper fix is to retrain with denser supervision so the model itself learns to tag every mention. Scoped as Phase 6.2.
+- **No hyperparameter sweep.** Phase 2's recipe is reused as-is. A modest LR / epoch sweep is the natural next tuning step.
+
+The point of stopping here is that the diminishing-returns curve is flattening — the first three model-quality wins (Phase 2 fine-tune, Phase 5 coref post-processor, Phase 6 ensemble) each lifted overall F1 by a measurable margin; the remaining work (CRF, coref retrain, sweep) is in the territory where you're moving F1 by half-points at non-trivial compute cost. For a portfolio piece that's already a credible "I can both build it and reason about its limits" demonstration; for a production system the rest is real but not glamorous.
 
 ---
 

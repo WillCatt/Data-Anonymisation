@@ -59,18 +59,65 @@ demo/
 └── requirements.txt                   used only by the deferred Gradio app
 ```
 
-## About `demo/app.py` (Gradio version — deferred)
+## Interactive Gradio demo — separate venv
 
-The interactive Gradio app is included for future use but is currently parked. Gradio's recent dependency tree (HuggingFace Hub, Typer, FastAPI versions) conflicts with spaCy 3.7's pinned deps in non-trivial ways. Rather than fight that for a demo, I went with the static showcase you're looking at.
+The `demo/app.py` Gradio version runs in its own isolated venv so the
+dep-tree conflicts (Gradio vs spaCy / typer / huggingface-hub) can't touch
+the main repo venv.
 
-If you want to revive it later, the route is:
+**First run:**
 
 ```bash
-pip install --force-reinstall \
-    "gradio>=4.20.0,<5.0.0" \
-    "huggingface-hub>=0.19.0,<0.27.0" \
-    "typer>=0.3.0,<0.10.0"
-python demo/app.py
+./demo/run_gradio.sh
 ```
 
-The app code is already version-tolerant (handles Gradio 4 / 6 API differences gracefully). The hard part is just the dep cascade.
+That script will:
+1. Create `demo/venv-gradio/` (gitignored)
+2. Install pinned versions from `demo/requirements-gradio.txt`
+3. Download `en_core_web_sm` into that venv
+4. Launch the Gradio app at <http://localhost:7860>
+
+**Subsequent runs** just activate the existing venv and launch — typically a
+few seconds.
+
+### NER backend — auto-detected at startup
+
+The app picks the strongest available backend at boot, in this order:
+
+1. **Phase 2 fine-tuned RoBERTa** if `phase2_baseline_comparison/checkpoints/roberta-tab/final/`
+   exists. (Best quality. Run `phase2_baseline_comparison/notebooks/03_finetune_roberta.ipynb`
+   first to produce it.) Note: also needs `transformers` + `torch` installed
+   in the gradio venv — add them to `demo/requirements-gradio.txt` if you go
+   this route.
+2. **spaCy `en_core_web_trf`** (transformer) — if installed in the gradio venv.
+3. **spaCy `en_core_web_sm`** (small, the bootstrap default).
+
+The UI shows which backend is loaded under the description. Override the
+auto-detection with `PIPELINE_BACKEND=spacy ./demo/run_gradio.sh`.
+
+### Features exposed in the UI
+
+- **Lite vs Pro** variant selector (radio button)
+- **k_target** slider (Pro only — mosaic-anonymity threshold)
+- **Pseudonymise** toggle — switch to referential tokens (`[PERSON_A]`, …)
+  with a vault tab showing the mapping
+- **Coref extension** toggle — Phase 5's shorthand-recovery post-processor
+  (defaults on)
+- Pre-canned examples that exercise all four sample categories
+
+**Three demo surfaces — which is which:**
+
+| | Static showcase | Local Gradio | HF Spaces |
+|---|---|---|---|
+| File | `demo/index.html` | `demo/app.py` | `spaces/app.py` |
+| Backend | None | Python + Gradio | Python + Gradio |
+| Setup | Zero — open in browser | `./demo/run_gradio.sh` | See `spaces/README.md` |
+| Inputs | 12 pre-canned examples | Paste any text | Paste any text |
+| NER backend | n/a (pre-computed) | Auto-detect (RoBERTa > trf > sm) | spaCy `_sm` (fast cold-start) |
+| Use case | Portfolio embed (iframe) | Local demo + screen-recording | Public demo, iframe-able |
+| Hosting cost | $0 (static file) | $0 (local) | $0 (HF free tier) |
+
+All three are kept in sync — the static showcase is the embedded artefact, the
+local Gradio is for development and screen-recording demos, and the HF Space
+is the public live version for portfolio visitors. See `../spaces/README.md`
+for deploying to HuggingFace Spaces.
