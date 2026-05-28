@@ -60,7 +60,7 @@ spaces/
 
    ```bash
    cp -r /path/to/data-anonymisation/spaces/* .
-   ```
+git    ```
 
 4. Commit and push:
 

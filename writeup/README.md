@@ -32,7 +32,7 @@ I structured this as a project a firm could plausibly commission, in three phase
 | **2 — Baseline comparison + fine-tune** | How much of the gap closes if we compare alternative models, and if we fine-tune on legal data? | 🟡 Code complete, runs pending |
 | **3 — Production pipeline** | What does the actual deployable thing look like? Two-variant package (Lite vs Pro) + CLI + static showcase. | ✅ Built |
 | **4 — Pseudonymisation + round-trip** | How does the firm get a *useful* answer back from an LLM run on a redacted document? Referential tokens (PERSON_A / PERSON_B), local vault, restore() helper. | ✅ Built |
-| **5 — Coreference-aware extension** | Off-the-shelf NER tags `Northwind Energy Ltd` on the first mention but leaks the bare `Northwind` references afterwards. Phase 5 closes that gap with a deterministic post-processor evaluated against TAB. | ✅ Built |
+| **5 — Coreference-aware extension** | Hypothesis: off-the-shelf NER tags `Northwind Energy Ltd` on the first mention but leaks the bare `Northwind` references afterwards. Built a deterministic post-processor and measured it against TAB — finding: the lift is tiny (~0.1pp on PERSON/ORG, zero elsewhere). Honest negative result worth telling. | ✅ Built · measured negative |
 | **6 — Domain backbone + ensemble** | Does a legal-domain-pretrained backbone beat general-purpose RoBERTa? Does an ensemble of three independent predictors beat the best single one? Two predictable wins from the NER literature, applied to the same TAB evaluation. | 🟡 Code complete, runs pending |
 
 This writeup focuses on Phase 1 — what's built, what it found, what it implies. Phase 2 and 3 are scoped in `phase2_baseline_comparison/README.md` and `phase3_pipeline/README.md` in the repo.
@@ -87,7 +87,9 @@ Now hash the bag of QUASI mentions in each document into a fingerprint, and ask:
 
 ![Mosaic k-anonymity distribution](../figures/mosaic_k_distribution.png)
 
-A large chunk of TAB test documents have a fingerprint shared by *no other document* — they are uniquely identifiable from their quasi-identifiers alone, even after a perfect DIRECT-identifier redaction. The exact percentage prints in the notebook; what matters here is the qualitative point.
+**Every single TAB document — 1,268 of 1,268 — has a unique QUASI fingerprint.** All of them are identifiable from their quasi-identifiers alone, even after a perfect DIRECT-identifier redaction. None reach the k ≥ 5 anonymity threshold; the median document carries 25 QUASI mentions, and the joint distribution of that many demographic facts is effectively a hash.
+
+(Caveat: fingerprints are matched on exact case-insensitive surface form. A real attacker matches fuzzily, so the true rate could shift in either direction. The qualitative finding — that the residual quasi-identifier bag is enough to re-identify essentially every document — is robust to that.)
 
 This is the **mosaic effect**, and it has design consequences:
 
@@ -242,24 +244,52 @@ A few things to mention because they're load-bearing in production:
 - **Coref spans get `confidence=0.7`**, lower than direct NER. A downstream consumer that wants to be paranoid can filter by confidence.
 - **`coref_extend` is a flag, not a hard-coded behaviour.** Defaults on, but the CLI exposes `--no-coref` and the Pipeline constructors accept `coref_extend=False`. The Phase 1/2 numbers in this writeup were generated *without* coref to keep them comparable to the original baselines.
 
-### How to measure it — the right evaluation
+### Measuring it against TAB
 
-TAB happens to be perfect for this measurement: every gold annotation has an `entity_id` linking coreferring mentions back to a canonical entity. So we can compute **mention-recall per entity** — for each gold entity, what fraction of its mentions did the pipeline catch?
+TAB happens to be perfect for this evaluation: every gold annotation has an `entity_id` linking coreferring mentions back to a canonical entity. So we can compute **mention-recall per entity** — for each gold entity, what fraction of its mentions did the pipeline catch?
 
-The script `phase5_coreference/evaluate_mention_recall.py` runs this evaluation. It reports two numbers for both baseline and coref-enabled variants:
+`phase5_coreference/evaluate_mention_recall.py` runs this against the full TAB test split (17,448 gold entities, 20,809 mentions across 555 documents) and reports two numbers for both baseline (`en_core_web_trf` + regex) and the same pipeline with the coref post-processor on:
 
-- **Micro recall** — total mentions caught ÷ total gold mentions. Weights every mention equally.
-- **Macro recall** — mean recall per entity. Weights every entity equally regardless of how many times it appears.
+- **Micro recall** — total mentions caught ÷ total gold mentions.
+- **Macro recall** — mean recall per entity.
 
-The expected pattern: PERSON and ORG recall jumps; DATETIME, QUANTITY, DEM, CODE barely move because those entities rarely have coref structure. The full run (~8 minutes on `en_core_web_trf`) generates a CSV of per-entity numbers and a summary JSON suitable for embedding the lift figure in this writeup.
+### The actual result — and why it's the most interesting one in the project
+
+![Phase 5 mention recall — baseline vs coref](../figures/phase5_mention_recall.png)
+
+| | Baseline | + Coref extender | Lift |
+|---|---|---|---|
+| Macro recall | 0.8399 | 0.8400 | **+0.0001** |
+| Micro recall | 0.8360 | 0.8363 | +0.0003 |
+| PERSON recall | 0.954 | 0.955 | +0.0007 |
+| ORG recall    | 0.806 | 0.807 | +0.0010 |
+| DATETIME / LOC / QUANTITY / DEM / MISC / CODE | unchanged | unchanged | 0 |
+
+In words: **the post-processor moves mention-recall by essentially nothing on TAB**. The only labels where it added anything were PERSON (+0.07pp) and ORG (+0.10pp), and even there the magnitude is closer to noise than signal.
+
+This is the kind of negative result that gets glossed over in most writeups. It's worth being explicit about why it happened, because the explanation is more useful than the prediction would have been:
+
+- **TAB is densely annotated.** Every coreferring mention of every entity is tagged by humans. So if the gold has 5 mentions of "Maria Petrova", all 5 are in the data — including the bare "Maria" later in the document.
+- **spaCy `en_core_web_trf` is already strong on PERSON / ORG / LOC.** Those labels hit ≥95% / 81% / 95% recall before the post-processor runs. There aren't many shorthand mentions left for the heuristic to discover; the model catches them directly.
+- **The post-processor only generates PERSON and ORG candidates.** That's by design — it's where the substring rule is safest — but it means the labels with biggest recall gaps (DEM at 34%, MISC at 8%, CODE at 0.6%) get no lift from this intervention at all.
+
+### What this taught me
+
+The hypothesis ("NER under-recalls shorthand in legal text") was reasonable in the abstract and even held on synthetic examples I crafted by hand. But against TAB it doesn't survive: the baseline NER is already near the recall ceiling on the categories the heuristic could help with, and the categories that genuinely have recall problems aren't ones a substring rule can fix.
+
+Three honest implications:
+
+1. **The post-processor is still defensible as a defensive layer.** It costs nothing at inference, the audit log shows what it adds, and on documents where NER *does* miss a shorthand (rare in TAB, but plausible in real-world matter notes that may be less carefully annotated), it'll catch them. But it isn't the recall lift the writeup originally claimed.
+2. **The real recall gaps live in DEM / MISC / CODE.** Closing those needs either Phase 2's fine-tune (already shown to help) or domain-specific recognisers (Presidio's regex layer catches CODE). The substring-coref heuristic can't touch them.
+3. **Measure before you celebrate.** I built and integrated this before running the TAB evaluation, then had to be honest about the result. The walkthrough notebook still demonstrates the mechanism works on synthetic inputs — but the synthetic case isn't TAB.
 
 ### What this phase does NOT do
 
-- **No pronoun resolution.** "She", "he", "they", "the company" — substring rule can't help. Off-the-shelf `fastcoref` or `spacy-coref` is the right next step, sketched in the walkthrough notebook.
-- **No retraining.** First-mention recall (where the Phase 2 fine-tune helps) is unchanged. This phase only improves subsequent-mention recall.
+- **No pronoun resolution.** Off-the-shelf `fastcoref` or `spacy-coref` is the actual right tool here, and on a corpus where NER recall isn't already saturated, it might lift meaningfully.
+- **No retraining.** First-mention recall (where Phase 2's fine-tune helps) is unchanged.
 - **Will misfire on coincidentally-shared surnames.** Two different "Smith"s in the same document collapse to one token. A proper coref model would distinguish them.
 
-The honest summary: with a few hours of work and no GPU time, mention-recall on TAB jumps measurably without breaking anything earlier. The walkthrough notebook explores the failure modes openly so a reader sees where the heuristic stops working — which is where Phase 5.1 (a real coref model) would start.
+So Phase 5 contributes more as a methodological exercise — "build the intervention, evaluate honestly, accept what the data says" — than as a quantitative improvement.
 
 ---
 
@@ -307,7 +337,7 @@ If any of these predictions don't hold, the deviation is the interesting result 
 - **No coref-augmented fine-tuning.** Phase 5's post-processor catches shorthand at inference time; the deeper fix is to retrain with denser supervision so the model itself learns to tag every mention. Scoped as Phase 6.2.
 - **No hyperparameter sweep.** Phase 2's recipe is reused as-is. A modest LR / epoch sweep is the natural next tuning step.
 
-The point of stopping here is that the diminishing-returns curve is flattening — the first three model-quality wins (Phase 2 fine-tune, Phase 5 coref post-processor, Phase 6 ensemble) each lifted overall F1 by a measurable margin; the remaining work (CRF, coref retrain, sweep) is in the territory where you're moving F1 by half-points at non-trivial compute cost. For a portfolio piece that's already a credible "I can both build it and reason about its limits" demonstration; for a production system the rest is real but not glamorous.
+The point of stopping here is that the diminishing-returns curve is flattening. The Phase 2 fine-tune was the one big quantitative win (+28.5pp F1 over baseline). Phase 3 and Phase 4 added engineering surface around the model (two-variant pipeline, pseudonymisation, audit log) without retraining. Phase 5 was an honest measured null on TAB — the heuristic doesn't help where the baseline is already near the recall ceiling. Phase 6's LegalBERT lands within noise of RoBERTa (84.9% vs 85.1%), and the ensemble actively *hurt* because of Presidio's noisy ORG predictions. The remaining work (CRF, coref retrain, hyperparameter sweep, dropping Presidio from the ensemble) is in the territory where each move is half a point of F1 at non-trivial compute cost. For a portfolio piece that's already a credible "I can both build it and reason about its limits" demonstration; for a production system the rest is real but not glamorous.
 
 ---
 

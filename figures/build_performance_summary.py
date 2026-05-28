@@ -17,6 +17,7 @@ Outputs:
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -211,6 +212,65 @@ def panel_precision_recall(df: pd.DataFrame, ax: plt.Axes) -> None:
     ax.set_axisbelow(True)
 
 
+def panel_phase5_mention_recall(ax: plt.Axes) -> bool:
+    """
+    Render the Phase 5 mention-recall comparison.
+
+    Reads phase5_coreference/results/mention_recall_summary.json. Returns
+    True if the panel rendered (file existed); False otherwise so the
+    caller can fall back to the progression callout.
+    """
+    summary_path = ROOT / "phase5_coreference" / "results" / "mention_recall_summary.json"
+    if not summary_path.exists():
+        return False
+
+    summary = json.loads(summary_path.read_text())
+    per_type = summary["per_type"]
+    types = [r["entity_type"] for r in per_type]
+    baseline = [r["baseline"] * 100 for r in per_type]
+    coref    = [r["with_coref"] * 100 for r in per_type]
+
+    x = np.arange(len(types))
+    width = 0.4
+    ax.bar(x - width/2, baseline, width=width,
+           color="#95a5a6", edgecolor="white", label="Baseline (no coref)")
+    ax.bar(x + width/2, coref, width=width,
+           color="#27ae60", edgecolor="white", label="+ Phase 5 CorefExtender")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(types, rotation=0, fontsize=9)
+    ax.set_ylabel("Mention recall (%)")
+    ax.set_title(
+        f"Phase 5 — mention recall (TAB test, "
+        f"{summary['baseline']['n_entities']:,} entities)",
+        fontweight="bold", fontsize=12, pad=10,
+    )
+    ax.set_ylim(0, 105)
+    ax.legend(loc="upper center", fontsize=8.5, framealpha=0.95)
+
+    # Annotate the bars where there's an actual delta worth seeing.
+    for i, (b, c) in enumerate(zip(baseline, coref)):
+        if abs(c - b) >= 0.05:  # only annotate non-zero deltas
+            ax.annotate(
+                f"+{c-b:.2f}pp", xy=(x[i], max(b, c) + 1),
+                ha="center", fontsize=7.5, fontweight="bold",
+                color="#27ae60",
+            )
+
+    # Headline finding caption
+    macro_b = summary["baseline"]["macro_recall"]
+    macro_c = summary["with_coref"]["macro_recall"]
+    ax.text(
+        0.5, -0.18,
+        f"Macro recall: {macro_b:.4f} → {macro_c:.4f}   "
+        f"({(macro_c - macro_b) * 100:+.2f} pp · essentially zero — "
+        "spaCy already at the ceiling on PERSON/ORG)",
+        transform=ax.transAxes, ha="center", fontsize=9, style="italic",
+        color="#586069",
+    )
+    return True
+
+
 def panel_progression_callout(df: pd.DataFrame, ax: plt.Axes) -> None:
     """Compact narrative callout — F1 lift + project phases at a glance."""
     overall = df[(df["mode"] == "partial") & (df["entity_type"] == "_ALL")]
@@ -301,6 +361,14 @@ def main() -> None:
     print(f"  → figures/phase_precision_recall.png")
     plt.close(fig)
 
+    # Standalone Phase 5 mention-recall panel — only if results exist
+    fig, ax = plt.subplots(figsize=(10, 5))
+    if panel_phase5_mention_recall(ax):
+        fig.tight_layout()
+        fig.savefig(out_dir / "phase5_mention_recall.png", dpi=130, bbox_inches="tight")
+        print(f"  → figures/phase5_mention_recall.png")
+    plt.close(fig)
+
     # — Multi-panel headline figure —
     print("\nWriting multi-panel summary:")
     fig = plt.figure(figsize=(16, 11))
@@ -309,12 +377,16 @@ def main() -> None:
     ax_overall   = fig.add_subplot(gs[0, 0])
     ax_byentity  = fig.add_subplot(gs[0, 1])
     ax_pr        = fig.add_subplot(gs[1, 0])
-    ax_callout   = fig.add_subplot(gs[1, 1])
+    ax_bottom_right = fig.add_subplot(gs[1, 1])
 
     panel_overall_f1(df, ax_overall)
     panel_f1_by_entity(df, ax_byentity)
     panel_precision_recall(df, ax_pr)
-    panel_progression_callout(df, ax_callout)
+    # Prefer the Phase 5 panel when we have data; otherwise show the
+    # narrative callout.
+    if not panel_phase5_mention_recall(ax_bottom_right):
+        ax_bottom_right.clear()
+        panel_progression_callout(df, ax_bottom_right)
 
     fig.suptitle(
         "Legal Text Anonymisation — Performance Across Phases",

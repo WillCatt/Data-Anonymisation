@@ -21,6 +21,10 @@ demo/venv-gradio/
 spaces/anonymisation/
 spaces/examples/
 
+# --- Local HF Spaces clone — nested git repo, not part of the main project ---
+# Use `./spaces/sync.sh` followed by `cp -r spaces/* Anonymiser/` to refresh it.
+Anonymiser/
+
 # --- Jupyter ---
 .ipynb_checkpoints/
 *.ipynb_checkpoints

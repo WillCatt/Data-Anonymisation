@@ -23,8 +23,8 @@ that we do not attempt here. The point is to show the *risk*, not solve it.
 """
 from __future__ import annotations
 
-from collections import Counter
-from typing import Dict, Iterable, List, Tuple
+from collections import Counter, defaultdict
+from typing import Dict, Iterable, List, Set, Tuple
 
 import pandas as pd
 
@@ -65,17 +65,31 @@ def k_anonymity_table(
 
     A document with k = 1 is uniquely identifiable from its quasi-
     identifiers alone — even if every name, date, and ID is masked.
+
+    Note on multi-annotator corpora: TAB (and similar) ships multiple
+    annotator entries per logical document, distinguished by annotator_id
+    but sharing a doc_id. We aggregate by *taking the union* of QUASI
+    mentions across all annotators for each doc_id — the canonical
+    "what anyone might have considered identifying" fingerprint per doc.
     """
-    rows = []
-    sig_by_doc: Dict[str, Tuple] = {}
+    # Step 1 — aggregate QUASI mentions per unique doc_id across annotators
+    mentions_by_doc: Dict[str, Set[Tuple[str, str]]] = defaultdict(set)
     for doc in docs:
         sig = quasi_identifier_signature(doc, entity_types=entity_types)
-        if len(sig) < min_signature_size:
-            continue
-        sig_by_doc[doc["doc_id"]] = sig
+        if sig:
+            mentions_by_doc[doc["doc_id"]].update(sig)
 
+    # Step 2 — canonicalise to sorted tuples and apply min_signature_size
+    sig_by_doc: Dict[str, Tuple[Tuple[str, str], ...]] = {}
+    for doc_id, mentions in mentions_by_doc.items():
+        if len(mentions) < min_signature_size:
+            continue
+        sig_by_doc[doc_id] = tuple(sorted(mentions))
+
+    # Step 3 — k = how many docs share this signature
     sig_counts: Counter = Counter(sig_by_doc.values())
 
+    rows = []
     for doc_id, sig in sig_by_doc.items():
         rows.append({
             "doc_id": doc_id,

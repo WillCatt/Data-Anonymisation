@@ -1,6 +1,6 @@
 # Phase 5 — Coreference-Aware Span Extension
 
-**Status:** Code complete. Module ships as a flag (`coref_extend=True`) on the existing pipelines, defaulting to enabled. Mention-recall evaluation against TAB is ready to run.
+**Status:** Built, measured, honest negative result. The post-processor moves TAB mention-recall by essentially zero (+0.07pp on PERSON, +0.10pp on ORG, zero elsewhere — see the **measured result** section below). It remains a defensive layer worth keeping, but the recall lift this phase originally predicted didn't materialise.
 
 ## The gap this fills
 
@@ -59,7 +59,23 @@ The script reports two numbers for both `baseline` (NER+regex, no coref) and `wi
 - **Micro recall** — `total mentions caught / total gold mentions`. Weights every mention equally.
 - **Macro recall** — average per-entity recall. Weights every entity equally regardless of how many times it's mentioned.
 
-The expected lift is biggest on PERSON and ORG (labels where shorthand is common and the substring rule is most reliable). DATETIME / QUANTITY / DEM barely move — those entities rarely have a coref structure.
+## The measured result — full TAB test, 17,448 entities
+
+| | Baseline | + Coref extender | Lift |
+|---|---|---|---|
+| Macro recall | 0.8399 | 0.8400 | +0.0001 |
+| Micro recall | 0.8360 | 0.8363 | +0.0003 |
+| PERSON recall | 0.954 | 0.955 | +0.0007 |
+| ORG recall    | 0.806 | 0.807 | +0.0010 |
+| DATETIME / LOC / QUANTITY / DEM / MISC / CODE | unchanged | unchanged | 0 |
+
+The heuristic does not measurably lift recall on TAB. Why:
+
+- **TAB is densely human-annotated** — every coreferring mention of every entity is already tagged in the gold.
+- **spaCy `en_core_web_trf` is already strong on PERSON / ORG / LOC.** Those labels hit ≥95% / 81% / 95% recall before the post-processor runs. There aren't many shorthand mentions left for the heuristic to discover; the model catches them directly.
+- **The post-processor only generates candidates for PERSON and ORG** (by design — those are the labels where the substring rule is safest). Categories with genuine recall problems (DEM at 34%, MISC at 8%, CODE at 0.6%) get no lift from this intervention at all.
+
+The post-processor is still defensible as a layer: it costs nothing at inference, the audit log shows exactly what it added, and on documents less densely annotated than TAB it would catch genuine misses. But it isn't the recall lift this phase originally predicted.
 
 ## How to use it
 
