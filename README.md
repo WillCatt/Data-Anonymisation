@@ -4,7 +4,7 @@
 
 [![Phase 1](https://img.shields.io/badge/Phase_1-Proof_of_Concept-2ecc71?style=flat-square)](notebooks/)
 [![Phase 2](https://img.shields.io/badge/Phase_2-RoBERTa_FT_85.1%25_F1-2ecc71?style=flat-square)](phase2_baseline_comparison/)
-[![Phase 3](https://img.shields.io/badge/Phase_3-Lite_+_Pro_Pipelines-2ecc71?style=flat-square)](phase3_pipeline/)
+[![Phase 3](https://img.shields.io/badge/Phase_3-Redact_+_Anonymise_Pipelines-2ecc71?style=flat-square)](phase3_pipeline/)
 [![Phase 4](https://img.shields.io/badge/Phase_4-Pseudonymisation_+_Round--Trip-2ecc71?style=flat-square)](phase4_pseudonymisation/)
 [![Phase 5](https://img.shields.io/badge/Phase_5-Coref_(measured_null)-95a5a6?style=flat-square)](phase5_coreference/)
 [![Phase 6](https://img.shields.io/badge/Phase_6-LegalBERT_84.9%25_·_Ensemble_55.3%25↓-95a5a6?style=flat-square)](phase6_advanced_training/)
@@ -42,7 +42,7 @@ A portfolio project on PII redaction for legal text, anchored in the [Text Anony
 │   ├── 02_presidio_baseline.ipynb     Presidio (stock + custom CODE recogniser)
 │   ├── 03_finetune_roberta.ipynb      RoBERTa fine-tuned on TAB train
 │   └── 04_head_to_head.ipynb          comparison plots
-├── phase3_pipeline/                   Phase 3 — Lite vs Pro pipelines
+├── phase3_pipeline/                   Phase 3 — Redact vs Anonymise pipelines
 │   └── notebooks/
 │       ├── 01_lite_walkthrough.ipynb
 │       ├── 02_pro_walkthrough.ipynb
@@ -172,7 +172,7 @@ The qualitative conclusions hold — the smaller model is just worse on PERSON a
 
 - [x] **Phase 1 — Proof of concept.** Baseline measurement (spaCy F1 = 0.566) + mosaic-effect quantification (1,268 / 1,268 TAB docs uniquely identifiable from QUASI fingerprint alone).
 - [x] **Phase 2 — Baseline comparison + fine-tune.** Four models evaluated on TAB test. **RoBERTa fine-tuned on TAB wins at F1 = 0.851** (+28.5 pp over spaCy). Presidio + CASE_NUMBER = 0.603 (regex closes CODE gap but ORG noise dominates). `dslim/bert-base-NER` = 0.167 (CoNLL label set discards most of TAB's annotation — not a meaningful comparison).
-- [x] **Phase 3 — Production pipeline (two variants).** `LitePipeline` (DIRECT-only) and `ProPipeline` (DIRECT + mosaic-aware QUASI generalization). Library + CLI + walkthrough notebooks + per-decision audit log.
+- [x] **Phase 3 — Production pipeline (two variants).** `LitePipeline` (DIRECT-only) and `ProPipeline` (DIRECT + mosaic-aware QUASI generalization). Library + CLI + walkthrough notebooks + per-decision audit log. **Product-facing names: Redact (`LitePipeline`) and Anonymise (`ProPipeline`)** — the code keeps the original class names.
 - [x] **Phase 4 — Pseudonymisation + round-trip.** `pseudonymise=True` flag on both pipelines (referential `[PERSON_A]`, `[PERSON_B]` tokens with substring-rule coreference). `restore()` helper for the LLM-answer round-trip. CLI `restore` subcommand + walkthrough notebook + showcase Sample 4 + threat-model diagram.
 - [x] **Phase 5 — Coreference-aware extension** *(measured null).* `coref_extend=True` post-processor; integrated as a defensive layer. **TAB mention-recall lift: +0.0001 macro** — spaCy is already at the recall ceiling on PERSON/ORG where the substring rule could help. Honest negative result, kept in the audit log.
 - [x] **Phase 6 — Domain backbone + ensemble** *(two measured nulls).* LegalBERT fine-tune: F1 = 0.849 — **within noise of RoBERTa-FT** (domain pretraining helps with vocabulary, not labels). 3-way ensemble (spaCy + LegalBERT + Presidio, union-vote): F1 = 0.553 — **backfired**, because Presidio's ORG precision is 0.14 and union voting inherits its worst member's noise.
