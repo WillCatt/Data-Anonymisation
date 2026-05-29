@@ -28,6 +28,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from anonymisation.cli import build_ner_provider          # noqa: E402
 from anonymisation.pipeline import LitePipeline            # noqa: E402
+from anonymisation.pipeline.pseudonymise import restore    # noqa: E402
 
 FINETUNED = ROOT / "phase2_baseline_comparison" / "checkpoints" / "roberta-tab" / "final"
 OUT = ROOT / "demo" / "results_showcase.json"
@@ -92,6 +93,34 @@ def run_doc(doc, lite_ner, real_ner):
     }
 
 
+def run_pseudonymise(doc, real_ner):
+    """Pseudonymise mode: referential [PERSON_A]/[ORG_A] tokens + vault + restore round-trip."""
+    r = LitePipeline(ner_provider=real_ner, pseudonymise=True)(doc["text"])
+    vault = dict(r.pseudonym_vault)
+
+    # Build a plausible "external LLM answer" that only uses tokens we actually have,
+    # then restore it locally — demonstrating real names never leave the building.
+    persons = sorted(t for t in vault if t.startswith("[PERSON_"))
+    orgs = sorted(t for t in vault if t.startswith("[ORG_"))
+    pa, pb = (persons + [None, None])[:2]
+    oa, ob = (orgs + [None, None])[:2]
+    if pa and pb and oa and ob:
+        llm_answer = (f"{pa} of {oa} is the acquiring party; {pb}, counsel to {ob}, "
+                      f"must secure board approval before {pa} proceeds.")
+    else:
+        llm_answer = " ".join(f"{t} is a party." for t in (persons + orgs))
+
+    return {
+        "id": doc["id"],
+        "title": doc["title"],
+        "input": doc["text"],
+        "pseudonymised_output": r.redacted_text,
+        "vault": vault,
+        "llm_answer_tokenised": llm_answer,
+        "restored": restore(llm_answer, vault),
+    }
+
+
 def main():
     if not FINETUNED.exists():
         raise SystemExit(f"Fine-tuned checkpoint not found at {FINETUNED}")
@@ -105,7 +134,11 @@ def main():
         print(f"  · {doc['id']}", flush=True)
         runs.append(run_doc(doc, lite_ner, real_ner))
 
-    OUT.write_text(json.dumps(runs, indent=2, ensure_ascii=False))
+    # Pseudonymise round-trip on the settlement doc (two people + two orgs → A/B tokens).
+    pseudo = run_pseudonymise(DOCS[1], real_ner)
+
+    payload = {"redact_runs": runs, "pseudonymise": pseudo}
+    OUT.write_text(json.dumps(payload, indent=2, ensure_ascii=False))
     print(f"\nSaved → {OUT}\n")
 
     # Human-readable summary — the rendered outputs are the source of truth.
@@ -114,6 +147,12 @@ def main():
         print(f"{r['title']}")
         print(f"  LITE output: {r['lite_output']}")
         print(f"  REAL output: {r['real_output']}")
+    print("=" * 78)
+    print(f"PSEUDONYMISE — {pseudo['title']}")
+    print(f"  output:   {pseudo['pseudonymised_output']}")
+    print(f"  vault:    {pseudo['vault']}")
+    print(f"  LLM ans:  {pseudo['llm_answer_tokenised']}")
+    print(f"  restored: {pseudo['restored']}")
 
 
 if __name__ == "__main__":

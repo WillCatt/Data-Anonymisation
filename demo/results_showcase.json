@@ -1,168 +1,187 @@
-[
-  {
-    "id": "grievance",
-    "title": "HR grievance memorandum",
-    "input": "This memorandum concerns the grievance brought by Dr. Eleanor Whitcombe, a consultant cardiologist, against St. Andrew's Regional Hospital Trust. On 4 February 2021, Dr. Whitcombe lodged a formal complaint (Ref. HR-2021-0847) with the Trust's board, chaired by Mr. Harold Beecham. After internal mediation failed, the matter was referred to the Employment Tribunal in Manchester (Case no. 2402319/2021). Whitcombe was represented by Patel & Rosenthal LLP; the Trust instructed Carrow Chambers.",
-    "lite_output": "This memorandum concerns the grievance brought by Dr. [PERSON], a consultant cardiologist, against St. Andrew's [ORG]. On 4 February 2021, Dr. [PERSON] lodged a formal complaint (Ref. HR-[MISC]) with the [ORG]'s board, chaired by Mr. [PERSON]. After internal mediation failed, the matter was referred to [ORG] in [PERSON] ([CODE]). [PERSON] was represented by [ORG]; the [ORG] instructed [PERSON].",
-    "real_output": "This memorandum concerns the grievance brought by [PERSON], a consultant cardiologist, against [ORG]. On 4 February 2021, [PERSON] lodged a formal complaint (Ref. HR-[MISC]) with the Trust's board, chaired by [PERSON]. After internal mediation failed, the matter was referred to the Employment Tribunal in Manchester ([CODE]). [PERSON] was represented by [ORG]; the Trust instructed [ORG].",
-    "lite_caught": [
-      {
-        "type": "PERSON",
-        "text": "Eleanor Whitcombe"
-      },
-      {
-        "type": "ORG",
-        "text": "Regional Hospital Trust"
-      },
-      {
-        "type": "PERSON",
-        "text": "Whitcombe"
-      },
-      {
-        "type": "MISC",
-        "text": "2021-0847"
-      },
-      {
-        "type": "ORG",
-        "text": "Trust"
-      },
-      {
-        "type": "PERSON",
-        "text": "Harold Beecham"
-      },
-      {
-        "type": "ORG",
-        "text": "the Employment Tribunal"
-      },
-      {
-        "type": "PERSON",
-        "text": "Manchester"
-      },
-      {
-        "type": "CODE",
-        "text": "Case no. 2402319/2021"
-      },
-      {
-        "type": "ORG",
-        "text": "Patel & Rosenthal LLP"
-      },
-      {
-        "type": "PERSON",
-        "text": "Carrow Chambers"
-      }
-    ],
-    "real_caught": [
-      {
-        "type": "PERSON",
-        "text": "Dr. Eleanor Whitcombe"
-      },
-      {
-        "type": "ORG",
-        "text": "St. Andrew's Regional Hospital Trust"
-      },
-      {
-        "type": "PERSON",
-        "text": "Dr. Whitcombe"
-      },
-      {
-        "type": "MISC",
-        "text": "2021-0847"
-      },
-      {
-        "type": "PERSON",
-        "text": "Mr. Harold Beecham"
-      },
-      {
-        "type": "CODE",
-        "text": "Case no. 2402319/2021"
-      },
-      {
-        "type": "PERSON",
-        "text": "Whitcombe"
-      },
-      {
-        "type": "ORG",
-        "text": "Patel & Rosenthal LLP"
-      },
-      {
-        "type": "ORG",
-        "text": "Carrow Chambers"
-      }
-    ]
-  },
-  {
+{
+  "redact_runs": [
+    {
+      "id": "grievance",
+      "title": "HR grievance memorandum",
+      "input": "This memorandum concerns the grievance brought by Dr. Eleanor Whitcombe, a consultant cardiologist, against St. Andrew's Regional Hospital Trust. On 4 February 2021, Dr. Whitcombe lodged a formal complaint (Ref. HR-2021-0847) with the Trust's board, chaired by Mr. Harold Beecham. After internal mediation failed, the matter was referred to the Employment Tribunal in Manchester (Case no. 2402319/2021). Whitcombe was represented by Patel & Rosenthal LLP; the Trust instructed Carrow Chambers.",
+      "lite_output": "This memorandum concerns the grievance brought by Dr. [PERSON], a consultant cardiologist, against St. Andrew's [ORG]. On 4 February 2021, Dr. [PERSON] lodged a formal complaint (Ref. HR-[MISC]) with the [ORG]'s board, chaired by Mr. [PERSON]. After internal mediation failed, the matter was referred to [ORG] in [PERSON] ([CODE]). [PERSON] was represented by [ORG]; the [ORG] instructed [PERSON].",
+      "real_output": "This memorandum concerns the grievance brought by [PERSON], a consultant cardiologist, against [ORG]. On 4 February 2021, [PERSON] lodged a formal complaint (Ref. HR-[MISC]) with the Trust's board, chaired by [PERSON]. After internal mediation failed, the matter was referred to the Employment Tribunal in Manchester ([CODE]). [PERSON] was represented by [ORG]; the Trust instructed [ORG].",
+      "lite_caught": [
+        {
+          "type": "PERSON",
+          "text": "Eleanor Whitcombe"
+        },
+        {
+          "type": "ORG",
+          "text": "Regional Hospital Trust"
+        },
+        {
+          "type": "PERSON",
+          "text": "Whitcombe"
+        },
+        {
+          "type": "MISC",
+          "text": "2021-0847"
+        },
+        {
+          "type": "ORG",
+          "text": "Trust"
+        },
+        {
+          "type": "PERSON",
+          "text": "Harold Beecham"
+        },
+        {
+          "type": "ORG",
+          "text": "the Employment Tribunal"
+        },
+        {
+          "type": "PERSON",
+          "text": "Manchester"
+        },
+        {
+          "type": "CODE",
+          "text": "Case no. 2402319/2021"
+        },
+        {
+          "type": "ORG",
+          "text": "Patel & Rosenthal LLP"
+        },
+        {
+          "type": "PERSON",
+          "text": "Carrow Chambers"
+        }
+      ],
+      "real_caught": [
+        {
+          "type": "PERSON",
+          "text": "Dr. Eleanor Whitcombe"
+        },
+        {
+          "type": "ORG",
+          "text": "St. Andrew's Regional Hospital Trust"
+        },
+        {
+          "type": "PERSON",
+          "text": "Dr. Whitcombe"
+        },
+        {
+          "type": "MISC",
+          "text": "2021-0847"
+        },
+        {
+          "type": "PERSON",
+          "text": "Mr. Harold Beecham"
+        },
+        {
+          "type": "CODE",
+          "text": "Case no. 2402319/2021"
+        },
+        {
+          "type": "PERSON",
+          "text": "Whitcombe"
+        },
+        {
+          "type": "ORG",
+          "text": "Patel & Rosenthal LLP"
+        },
+        {
+          "type": "ORG",
+          "text": "Carrow Chambers"
+        }
+      ]
+    },
+    {
+      "id": "settlement",
+      "title": "Cross-border settlement note",
+      "input": "Anya Kowalski of Meridian Capital Partners met with Tomás Ferreira, general counsel of Halcyon Biotech GmbH, in Frankfurt on 12 March 2022 to finalise the settlement under Application no. 41872/19. Ms Kowalski confirmed that payment of EUR 4.2 million would be wired to the account held at Banco Nacional de Lisboa (IBAN PT50 0002 0123 1234 5678 9015 4).",
+      "lite_output": "[PERSON] of [ORG] met with [PERSON], general counsel of [ORG], in Frankfurt on 12 March 2022 to finalise the settlement under [CODE]. [PERSON] confirmed that payment of EUR 4.2 million would be wired to the account held at [ORG] (IBAN [CODE]).",
+      "real_output": "[PERSON] of [ORG] met with [PERSON], general counsel of [ORG], in Frankfurt on 12 March 2022 to finalise the settlement under [CODE]. [PERSON] confirmed that payment of EUR 4.2 million would be wired to the account held at [ORG] (IBAN [CODE]).",
+      "lite_caught": [
+        {
+          "type": "PERSON",
+          "text": "Anya Kowalski"
+        },
+        {
+          "type": "ORG",
+          "text": "Meridian Capital Partners"
+        },
+        {
+          "type": "PERSON",
+          "text": "Tomás Ferreira"
+        },
+        {
+          "type": "ORG",
+          "text": "Halcyon Biotech GmbH"
+        },
+        {
+          "type": "CODE",
+          "text": "Application no. 41872/19"
+        },
+        {
+          "type": "PERSON",
+          "text": "Ms Kowalski"
+        },
+        {
+          "type": "ORG",
+          "text": "Banco Nacional de Lisboa"
+        },
+        {
+          "type": "CODE",
+          "text": "PT50 0002 0123 1234 5678 9015 4"
+        }
+      ],
+      "real_caught": [
+        {
+          "type": "PERSON",
+          "text": "Anya Kowalski"
+        },
+        {
+          "type": "ORG",
+          "text": "Meridian Capital Partners"
+        },
+        {
+          "type": "PERSON",
+          "text": "Tomás Ferreira"
+        },
+        {
+          "type": "ORG",
+          "text": "Halcyon Biotech GmbH"
+        },
+        {
+          "type": "CODE",
+          "text": "Application no. 41872/19"
+        },
+        {
+          "type": "PERSON",
+          "text": "Ms Kowalski"
+        },
+        {
+          "type": "ORG",
+          "text": "Banco Nacional de Lisboa"
+        },
+        {
+          "type": "CODE",
+          "text": "PT50 0002 0123 1234 5678 9015 4"
+        }
+      ]
+    }
+  ],
+  "pseudonymise": {
     "id": "settlement",
     "title": "Cross-border settlement note",
     "input": "Anya Kowalski of Meridian Capital Partners met with Tomás Ferreira, general counsel of Halcyon Biotech GmbH, in Frankfurt on 12 March 2022 to finalise the settlement under Application no. 41872/19. Ms Kowalski confirmed that payment of EUR 4.2 million would be wired to the account held at Banco Nacional de Lisboa (IBAN PT50 0002 0123 1234 5678 9015 4).",
-    "lite_output": "[PERSON] of [ORG] met with [PERSON], general counsel of [ORG], in Frankfurt on 12 March 2022 to finalise the settlement under [CODE]. [PERSON] confirmed that payment of EUR 4.2 million would be wired to the account held at [ORG] (IBAN [CODE]).",
-    "real_output": "[PERSON] of [ORG] met with [PERSON], general counsel of [ORG], in Frankfurt on 12 March 2022 to finalise the settlement under [CODE]. [PERSON] confirmed that payment of EUR 4.2 million would be wired to the account held at [ORG] (IBAN [CODE]).",
-    "lite_caught": [
-      {
-        "type": "PERSON",
-        "text": "Anya Kowalski"
-      },
-      {
-        "type": "ORG",
-        "text": "Meridian Capital Partners"
-      },
-      {
-        "type": "PERSON",
-        "text": "Tomás Ferreira"
-      },
-      {
-        "type": "ORG",
-        "text": "Halcyon Biotech GmbH"
-      },
-      {
-        "type": "CODE",
-        "text": "Application no. 41872/19"
-      },
-      {
-        "type": "PERSON",
-        "text": "Ms Kowalski"
-      },
-      {
-        "type": "ORG",
-        "text": "Banco Nacional de Lisboa"
-      },
-      {
-        "type": "CODE",
-        "text": "PT50 0002 0123 1234 5678 9015 4"
-      }
-    ],
-    "real_caught": [
-      {
-        "type": "PERSON",
-        "text": "Anya Kowalski"
-      },
-      {
-        "type": "ORG",
-        "text": "Meridian Capital Partners"
-      },
-      {
-        "type": "PERSON",
-        "text": "Tomás Ferreira"
-      },
-      {
-        "type": "ORG",
-        "text": "Halcyon Biotech GmbH"
-      },
-      {
-        "type": "CODE",
-        "text": "Application no. 41872/19"
-      },
-      {
-        "type": "PERSON",
-        "text": "Ms Kowalski"
-      },
-      {
-        "type": "ORG",
-        "text": "Banco Nacional de Lisboa"
-      },
-      {
-        "type": "CODE",
-        "text": "PT50 0002 0123 1234 5678 9015 4"
-      }
-    ]
+    "pseudonymised_output": "[PERSON_A] of [ORG_A] met with [PERSON_B], general counsel of [ORG_B], in Frankfurt on 12 March 2022 to finalise the settlement under [CODE_A]. [PERSON_A] confirmed that payment of EUR 4.2 million would be wired to the account held at [ORG_C] (IBAN [CODE_B]).",
+    "vault": {
+      "[PERSON_A]": "Anya Kowalski",
+      "[ORG_A]": "Meridian Capital Partners",
+      "[PERSON_B]": "Tomás Ferreira",
+      "[ORG_B]": "Halcyon Biotech GmbH",
+      "[CODE_A]": "Application no. 41872/19",
+      "[ORG_C]": "Banco Nacional de Lisboa",
+      "[CODE_B]": "PT50 0002 0123 1234 5678 9015 4"
+    },
+    "llm_answer_tokenised": "[PERSON_A] of [ORG_A] is the acquiring party; [PERSON_B], counsel to [ORG_B], must secure board approval before [PERSON_A] proceeds.",
+    "restored": "Anya Kowalski of Meridian Capital Partners is the acquiring party; Tomás Ferreira, counsel to Halcyon Biotech GmbH, must secure board approval before Anya Kowalski proceeds."
   }
-]
+}
