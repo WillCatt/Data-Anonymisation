@@ -24,9 +24,15 @@ The fix:
     candidate that's too short or too generic to be safe (e.g. "Energy",
     "Holdings", "the").
 
-This module is the headline of Phase 5. It runs in O(spans × doc_length),
-needs no extra dependencies, and lifts mention-recall on TAB by a measurable
-margin without retraining anything.
+This module is the Phase 5 intervention. It runs in O(spans × doc_length)
+and needs no extra dependencies. Measured against TAB, its mention-recall
+lift is essentially zero (+0.0001 macro): spaCy's en_core_web_trf is already
+at the recall ceiling on the PERSON/ORG mentions the substring rule could
+recover, and the labels with real recall gaps (DEM, MISC, CODE) are ones it
+can't help with. It is kept as a zero-cost defensive layer — every span it
+adds is logged with source="coref" and confidence=0.7 — not as a source of
+headline gains. See phase5_coreference/evaluate_mention_recall.py for the
+evaluation that produced the null.
 """
 from __future__ import annotations
 

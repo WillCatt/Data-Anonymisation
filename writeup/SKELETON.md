@@ -55,7 +55,7 @@
 
 **Purpose.** Deliver the project's most original finding.
 
-**Figure.** `figures/mosaic_k_distribution.png` (the corrected version — 1,268/1,268 unique).
+**Figure.** `figures/mosaic_reidentification.png` (re-identification curve — 58% unique from 1 quasi-fact, 95% from 3, 1,268/1,268 at the full fingerprint — plus the signature-size histogram).
 
 **Must contain.**
 - The thought experiment: pretend the NER is perfect; every DIRECT identifier is masked. What's left?
@@ -234,7 +234,7 @@ The post-processor stays in the pipeline as a defensive layer (costs nothing at 
 |---|---|---|
 | Hero | `phase_overall_f1.png` (trimmed 5-bar) | ✅ Built |
 | §2 | `phase1_f1_scores.png` | Existing |
-| §3 | `mosaic_k_distribution.png` (corrected) | ✅ Built |
+| §3 | `mosaic_reidentification.png` (re-id curve + signature sizes) | ✅ Built |
 | §4 | `phase_overall_f1.png` + `gap_closed_by_entity.png` | ✅ Built |
 | §5 | `pipeline_architecture.png` + `round_trip_threat_model.png` | ✅ Built |
 | §5.3 | Demo screenshot | TODO — record + crop |

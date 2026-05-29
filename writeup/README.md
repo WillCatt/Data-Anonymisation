@@ -29,13 +29,13 @@ I structured this as a project a firm could plausibly commission, in three phase
 | Phase | Question | Status |
 |---|---|---|
 | **1 — Proof of concept** | How big is the off-the-shelf gap? Can we measure where it leaks? Is the residual *mosaic* risk something the buyer needs to worry about? | ✅ Built |
-| **2 — Baseline comparison + fine-tune** | How much of the gap closes if we compare alternative models, and if we fine-tune on legal data? | 🟡 Code complete, runs pending |
+| **2 — Baseline comparison + fine-tune** | How much of the gap closes if we compare alternative models, and if we fine-tune on legal data? | ✅ Built — RoBERTa-FT wins at F1 = 0.851 |
 | **3 — Production pipeline** | What does the actual deployable thing look like? Two-variant package (Lite vs Pro) + CLI + static showcase. | ✅ Built |
 | **4 — Pseudonymisation + round-trip** | How does the firm get a *useful* answer back from an LLM run on a redacted document? Referential tokens (PERSON_A / PERSON_B), local vault, restore() helper. | ✅ Built |
 | **5 — Coreference-aware extension** | Hypothesis: off-the-shelf NER tags `Northwind Energy Ltd` on the first mention but leaks the bare `Northwind` references afterwards. Built a deterministic post-processor and measured it against TAB — finding: the lift is tiny (~0.1pp on PERSON/ORG, zero elsewhere). Honest negative result worth telling. | ✅ Built · measured negative |
-| **6 — Domain backbone + ensemble** | Does a legal-domain-pretrained backbone beat general-purpose RoBERTa? Does an ensemble of three independent predictors beat the best single one? Two predictable wins from the NER literature, applied to the same TAB evaluation. | 🟡 Code complete, runs pending |
+| **6 — Domain backbone + ensemble** | Does a legal-domain-pretrained backbone beat general-purpose RoBERTa? Does an ensemble of three independent predictors beat the best single one? Two predictable wins from the NER literature, applied to the same TAB evaluation. | ✅ Built · two measured nulls |
 
-This writeup focuses on Phase 1 — what's built, what it found, what it implies. Phase 2 and 3 are scoped in `phase2_baseline_comparison/README.md` and `phase3_pipeline/README.md` in the repo.
+All six phases are built. Every number below is measured on TAB's 555-document test split, not projected — the full per-model, per-entity metrics live in `results/` and each phase's `results/` directory, and the figures are regenerated from those CSVs.
 
 ---
 
@@ -58,8 +58,8 @@ That second column is the whole point. You cannot study the mosaic effect with a
 
 I ran spaCy's `en_core_web_trf` (their strongest English NER, transformer-based) against TAB's full 555-document test split.
 
-> **Overall partial-match F1: 0.57.**
-> **Overall exact-match F1: 0.39.**
+> **Overall partial-match F1: 0.566.**
+> **Overall exact-match F1: 0.381.**
 
 That's "we either missed or misidentified more than half of all sensitive entities, even on the lenient scoring." The full per-entity-type table is in `notebooks/02_baseline_evaluation.ipynb`; the headlines:
 
@@ -75,7 +75,7 @@ A few of these warrant calling out specifically:
 
 The failures aren't sprinkled evenly. They cluster in places that *make sense given how the model was trained*. spaCy was optimised for newswire English, where case file numbers don't exist, where "the applicant" is not a category, and where "asylum-seeker" is just a noun. Asking it to anonymise legal text is asking it to recognise PII categories it has never seen.
 
-This is a *good* finding for the project, because it means the gap is closeable. A model trained on legal entity types should do dramatically better. That's exactly what Phase 2 will test.
+This is a *good* finding for the project, because it means the gap is closeable. A model trained on legal entity types should do dramatically better — and Phase 2 confirms it: fine-tuning on TAB lifts F1 from 0.566 to 0.851.
 
 ### Finding 3 — Even a perfect NER wouldn't be enough
 
@@ -85,11 +85,11 @@ Take every test document. Pretend the NER is perfect — every DIRECT identifier
 
 Now hash the bag of QUASI mentions in each document into a fingerprint, and ask: how often is that fingerprint *unique within the corpus*?
 
-![Mosaic k-anonymity distribution](../figures/mosaic_k_distribution.png)
+![How quasi-identifiers re-identify documents](../figures/mosaic_reidentification.png)
 
-**Every single TAB document — 1,268 of 1,268 — has a unique QUASI fingerprint.** All of them are identifiable from their quasi-identifiers alone, even after a perfect DIRECT-identifier redaction. None reach the k ≥ 5 anonymity threshold; the median document carries 25 QUASI mentions, and the joint distribution of that many demographic facts is effectively a hash.
+The answer is stark, and it arrives fast. Knowing just **one** quasi-identifier already singles out **58% of documents**. By **three**, it's **95%**. Across the full fingerprint, **every single TAB document — 1,268 of 1,268 — is uniquely identifiable** from its quasi-identifiers alone, even after a perfect DIRECT-identifier redaction; none reach a k ≥ 5 anonymity set. The right-hand panel shows why: the median document carries **25 distinct quasi-identifiers**, and the joint distribution of that many demographic facts is effectively a hash.
 
-(Caveat: fingerprints are matched on exact case-insensitive surface form. A real attacker matches fuzzily, so the true rate could shift in either direction. The qualitative finding — that the residual quasi-identifier bag is enough to re-identify essentially every document — is robust to that.)
+(Caveat: fingerprints are matched on exact case-insensitive surface form, and the left-hand curve reveals identity using the *first n* facts in document order. A real attacker matches fuzzily and gets to choose *which* facts to combine, so the exact crossing points would move — but the shape is robust: a handful of innocuous demographic facts is enough to re-identify essentially any document.)
 
 This is the **mosaic effect**, and it has design consequences:
 
@@ -110,11 +110,17 @@ Phase 1 measured the problem. Phase 2 asks the obvious follow-up: *how much of i
 | Microsoft Presidio | Industry-standard PII tool — NER + a regex layer with custom recognisers |
 | RoBERTa fine-tuned on TAB train | The contender — same architecture class as `bert-base`, but trained on TAB's labels directly |
 
-The hypotheses are concrete. **General-purpose models will cluster together** at ~0.5–0.6 F1, because they share the same fundamental problem: their label sets don't fit legal text. **Targeted regex closes targeted gaps** — adding a `CASE_NUMBER` recogniser to Presidio should take CODE recall from 0% to near-100%, but won't help anywhere else. **Fine-tuning dominates on TAB-specific labels** — CODE, DEM, and MISC should all jump dramatically with a model that has actually seen them in training.
+The hypotheses were concrete, and the runs bore them out. **The general-purpose models clustered at the low end** — spaCy at 0.566, and `dslim/bert-base-NER` far worse at 0.167 (its CoNLL-2003 label set, PER/LOC/ORG/MISC, discards most of TAB's annotation by construction, so it isn't a meaningful comparison — kept in the repo for completeness). **Targeted regex closed a targeted gap but didn't move the headline** — adding a `CASE_NUMBER` recogniser to Presidio took CODE recall from 0% toward full coverage, yet overall F1 barely shifted (0.602 → 0.603), because Presidio's ORG precision is 0.14 and that noise dominates. **Fine-tuning dominated**: RoBERTa fine-tuned on TAB scored **0.851 partial-match F1 (0.784 exact)** — a +28.5 pp lift over the spaCy baseline.
 
-Whether the fine-tune also wins on PERSON and ORG (where the off-the-shelf models have plenty of training data) is the interesting empirical question. Both possible answers say something useful: a clean fine-tune sweep argues for "always retrain on your domain"; a draw on PERSON/ORG with a sweep elsewhere argues for the cleaner narrative "fine-tune the categories your domain *adds*, not the ones it shares with newswire English".
+| Model | Partial-F1 | Exact-F1 |
+|---|---|---|
+| spaCy `en_core_web_trf` (baseline) | 0.566 | 0.381 |
+| `dslim/bert-base-NER` | 0.167 | 0.055 |
+| Presidio (stock) | 0.602 | 0.425 |
+| Presidio + `CASE_NUMBER` | 0.603 | 0.425 |
+| **RoBERTa fine-tuned on TAB** | **0.851** | **0.784** |
 
-The plots from `04_head_to_head.ipynb` will land here once the notebooks have been executed.
+On the open empirical question — whether the fine-tune *also* wins on PERSON and ORG, where the off-the-shelf models have plenty of training data — the answer was the cleaner of the two. PERSON was effectively a draw (both models near the ceiling, ~0.89 F1), while the fine-tune's gains concentrated on the labels TAB *adds* over newswire English: CODE went 0 → 0.92, QUANTITY and LOC jumped sharply, and ORG lifted ~35 pp off spaCy's noisy 0.30. The lesson is the cleaner narrative — **fine-tune the categories your domain adds, not the ones it shares with newswire English**. The per-entity breakdown is in `figures/gap_closed_by_entity.png`.
 
 ### Phase 2 design choices worth flagging
 
@@ -142,6 +148,43 @@ The first two phases measure the problem and close most of it. Phase 3 wraps the
 - **Pipeline Pro** — DIRECT redaction *plus* mosaic-aware QUASI generalization. Right tool when the threat model is "a determined adversary could combine quasi-identifiers to re-identify the document". This is where the iterate-until-safe loop lives.
 
 Both pipelines produce the same shape of `RedactionResult` — redacted text, a per-decision audit log, the spans they touched. Pro additionally surfaces an initial and final k-anonymity score plus the number of generalization iterations it ran. A firm can A/B them on the same matter notes and pick a default per matter type.
+
+### One document, three modes
+
+Metrics measure the *model*; this measures the *product*. Here is the library run end-to-end on a single matter note, fine-tuned RoBERTa as the NER backend (reproduce with `demo/worked_example.py`).
+
+**Input** — privileged, never leaves the firm:
+
+> The applicant, Maria Petrova, is a 47-year-old Bulgarian national living in Plovdiv. On 12 March 2018 she filed a complaint (Application no. 12345/67) against the Sofia District Court alleging discrimination on grounds of her Roma ethnicity. Maria has been employed as a nurse since 2010 and is the mother of three children.
+
+**Lite** — DIRECT identifiers stripped, quasi-identifiers left readable:
+
+> The applicant, **[PERSON]**, is a 47-year-old Bulgarian national living in Plovdiv. On 12 March 2018 she filed a complaint (**[CODE]**) against the **[ORG]** alleging discrimination on grounds of her Roma ethnicity. **[PERSON]** has been employed as a nurse since 2010 and is the mother of three children.
+
+Both the full name *and* the later bare "Maria" are caught, and `Application no. 12345/67` is removed by the regex pass — the `CODE` type spaCy has no label for.
+
+**Lite + pseudonymise** — referential tokens instead of flat tags, so a downstream LLM can still reason about who's who, with a vault held locally for the round-trip:
+
+> The applicant, **[PERSON_A]**, … filed a complaint (**[CODE_A]**) against the **[ORG_A]** …
+
+```json
+{"[PERSON_A]": "Maria Petrova", "[CODE_A]": "Application no. 12345/67", "[ORG_A]": "Sofia District Court"}
+```
+
+**Pro** — DIRECT redaction plus mosaic-aware QUASI generalisation:
+
+> The applicant, **[PERSON]**, is a **[DEM] [DEM]** national living in **[LOC]**. On **[DATETIME]** she filed a complaint (**[CODE]**) against the **[ORG]** … employed as a **[DEM]** since **[DATETIME]** …
+
+```
+mosaic risk: k_initial=1 (unique within TAB) → 3 generalisation iterations → full suppression
+```
+
+This is the honest, instructive case. A single out-of-corpus document is unique against the TAB haystack (k=1), so no amount of generalisation reaches k≥5 and Pro correctly falls back to suppressing every quasi-identifier. With the firm's *own* corpus of similar matters as the haystack — the production setup — the intermediate levels the loop tried (`Bulgarian → European`, `Plovdiv → Bulgaria`) would survive where they no longer single the document out. Every step is in the audit log:
+
+```
+[    redact] PERSON  'Maria Petrova'  → '[PERSON]'   DIRECT identifier; always suppressed.
+[generalize] DEM     'Bulgarian'      → 'European'   level 1; post-step k=1.
+```
 
 ### How Pro's iterate-until-safe loop works
 
@@ -355,25 +398,27 @@ Things I noticed mid-project that I'd push on if I had another two weeks:
 
 ```
 .
-├── README.md                          repo overview + setup
+├── README.md                          repo overview + setup + full layout
 ├── requirements.txt                   pinned deps
 ├── src/anonymisation/                 reusable Python package
-│   ├── data.py                        TAB loader
-│   ├── mapping.py                     TAB ↔ spaCy entity mapping
-│   ├── evaluation.py                  span-level P/R/F1
-│   ├── demo.py                        try-it-yourself helper
-│   └── mosaic.py                      k-anonymity / fingerprint helpers
-├── notebooks/
-│   ├── 01_problem_setup.ipynb         EDA + framing + first taste of the mosaic
-│   ├── 02_baseline_evaluation.ipynb   spaCy vs TAB — the core experiment
-│   └── 03_mosaic_effect.ipynb         re-identification deep dive
-├── figures/                           saved plots used in this writeup
-├── results/                           per-entity-type metrics CSV
-├── phase2_baseline_comparison/        scoped, not yet implemented
-├── phase3_pipeline/                   scoped, not yet implemented
-├── demo/                              live-demo plan + (later) Gradio app
+│   ├── data.py mapping.py             TAB loader + spaCy mapping
+│   ├── evaluation.py                  span-level P/R/F1 (the shared scorer)
+│   ├── mosaic.py                      k-anonymity / fingerprint helpers
+│   ├── predictors.py ensemble.py      model adapters + voting combiner
+│   └── pipeline/                      Lite + Pro + pseudonymise + coref
+├── notebooks/                         Phase 1 — baseline + mosaic
+├── phase2_baseline_comparison/        Phase 2 — bake-off + RoBERTa fine-tune
+├── phase3_pipeline/                   Phase 3 — Lite vs Pro walkthroughs
+├── phase4_pseudonymisation/           Phase 4 — referential tokens + restore
+├── phase5_coreference/                Phase 5 — coref extender (measured null)
+├── phase6_advanced_training/          Phase 6 — LegalBERT + ensemble
+├── tests/                             pytest suite for the pure-logic modules
+├── figures/  results/                 plots + per-entity metrics CSVs
+├── demo/  spaces/                     Gradio app + HuggingFace Spaces bundle
 └── writeup/                           this document
 ```
+
+The repo `README.md` carries the authoritative file-by-file layout.
 
 ---
 

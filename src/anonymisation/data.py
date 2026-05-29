@@ -11,15 +11,17 @@ caches locally; subsequent loads are instant.
 from __future__ import annotations
 
 from collections import Counter, defaultdict
-from typing import Any, Dict
+from typing import TYPE_CHECKING, Any, Dict
 
-from datasets import DatasetDict, load_dataset
+if TYPE_CHECKING:  # import only for type checkers — keeps `import anonymisation`
+    from datasets import DatasetDict  # light (no datasets/pyarrow needed to import the package)
 
 DEFAULT_HF_PATH = "ildpil/text-anonymization-benchmark"
 
 
-def load_tab(hf_path: str = DEFAULT_HF_PATH) -> DatasetDict:
+def load_tab(hf_path: str = DEFAULT_HF_PATH) -> "DatasetDict":
     """Load TAB from HuggingFace. Returns a DatasetDict with train/validation/test splits."""
+    from datasets import load_dataset  # lazy — only Phase-1+ data work pulls this dep
     return load_dataset(hf_path)
 
 

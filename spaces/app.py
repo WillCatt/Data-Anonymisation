@@ -217,6 +217,9 @@ def build_ui():
                 examples=examples,
                 inputs=[input_text, variant, k_target, max_iters, pseudonymise, coref_extend],
                 label="Pre-canned examples",
+                # HF Spaces defaults to caching examples, which requires fn+outputs
+                # and would run the pipeline on every example at boot. Disable it.
+                cache_examples=False,
             )
 
         run_btn.click(

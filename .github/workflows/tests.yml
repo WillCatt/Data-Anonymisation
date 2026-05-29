@@ -1,0 +1,25 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # The pure-logic test suite is deliberately dependency-light: it exercises
+      # the pipeline/eval/mosaic code without loading any NER model, so CI needs
+      # only pytest + pandas (no torch/spaCy download, no TAB fetch).
+      - name: Install test dependencies
+        run: pip install pytest pandas
+
+      - name: Run tests
+        run: pytest

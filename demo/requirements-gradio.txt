@@ -22,6 +22,12 @@ typer>=0.3.0,<0.10.0
 # we've already downloaded works without re-downloading.
 spacy==3.7.4
 
+# The sm model as a direct wheel — `python -m spacy download` can 404 when
+# spaCy's compatibility-table lookup resolves to an empty version. Pinning the
+# wheel makes the bootstrap deterministic (run_gradio.sh no longer needs the
+# separate `spacy download` step).
+https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
+
 # Dataset loading for the mosaic scorer (Phase 3 Pro pipeline).
 datasets==2.18.0
 pandas>=2.0.0

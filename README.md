@@ -10,7 +10,8 @@
 [![Phase 6](https://img.shields.io/badge/Phase_6-LegalBERT_84.9%25_·_Ensemble_55.3%25↓-95a5a6?style=flat-square)](phase6_advanced_training/)
 [![Demo](https://img.shields.io/badge/Demo-Static_+_Gradio_+_Spaces-3498db?style=flat-square)](demo/)
 [![Best F1](https://img.shields.io/badge/Best_F1-85.1%25_(RoBERTa)-27ae60?style=flat-square)](figures/phase_overall_f1.png)
-[![Mosaic](https://img.shields.io/badge/Mosaic-1268/1268_documents_unique-d73a49?style=flat-square)](figures/mosaic_k_distribution.png)
+[![Mosaic](https://img.shields.io/badge/Mosaic-unique_by_3_quasi--facts-d73a49?style=flat-square)](figures/mosaic_reidentification.png)
+[![tests](https://github.com/WillCatt/Data-Anonymisation/actions/workflows/tests.yml/badge.svg)](https://github.com/WillCatt/Data-Anonymisation/actions/workflows/tests.yml)
 
 A portfolio project on PII redaction for legal text, anchored in the [Text Anonymization Benchmark](https://github.com/NorskRegnesentral/text-anonymization-benchmark) (TAB). Tests whether off-the-shelf NER is enough to anonymise court documents, and quantifies the residual mosaic / re-identification risk that NER alone cannot fix.
 
@@ -86,6 +87,7 @@ A portfolio project on PII redaction for legal text, anchored in the [Text Anony
 │   └── SKELETON.md                    restructured v2 (3 acts + epilogue) — fill-in scaffold
 ├── demo/                              Static showcase + local Gradio app
 │   ├── index.html                     static showcase (open in browser)
+│   ├── worked_example.py              one doc → Lite · Pro · pseudonymise + audit (real run)
 │   ├── build_showcase.py              regenerator script
 │   ├── examples/                      input samples
 │   ├── app.py                         Gradio interactive demo (auto-detects best NER backend)
@@ -98,7 +100,7 @@ A portfolio project on PII redaction for legal text, anchored in the [Text Anony
 │   ├── pre-build.sh                   spaCy model download on first build
 │   └── sync.sh                        refresh package + examples from main repo
 └── figures/                           plots for the writeup + portfolio site
-    ├── mosaic_k_distribution.png      100% of TAB docs uniquely identifiable (Act I centerpiece)
+    ├── mosaic_reidentification.png    re-id curve (95% unique by 3 facts) + signature sizes (Act I centerpiece)
     ├── phase_overall_f1.png           trimmed 5-bar headline ladder
     ├── gap_closed_by_entity.png       per-entity F1 lift, P1 baseline → P2 fine-tune
     ├── ensemble_backfire.png          Phase 6 — per-entity precision collapse of 3-way ensemble
@@ -108,7 +110,8 @@ A portfolio project on PII redaction for legal text, anchored in the [Text Anony
     ├── phase5_mention_recall.png      Phase 5 coref extender — measured null
     ├── pipeline_architecture.svg/.png Lite + Pro + Pseudonymise system diagram (Act III)
     ├── round_trip_threat_model.svg/.png  firm ↔ LLM provider trust boundary (Phase 4)
-    └── build_performance_summary.py   regenerator script
+    ├── build_performance_summary.py   regenerator — phase performance figures (from results CSVs)
+    └── build_mosaic.py                 regenerator — mosaic re-identification figure (from TAB)
 ```
 
 ---
@@ -153,12 +156,13 @@ The qualitative conclusions hold — the smaller model is just worse on PERSON a
 |---|---|
 | Read the story | [`writeup/README.md`](writeup/README.md) (long v1) · [`writeup/SKELETON.md`](writeup/SKELETON.md) (restructured v2 outline) |
 | See the headline result in one chart | [`figures/phase_overall_f1.png`](figures/phase_overall_f1.png) (5-bar ladder, ensemble falling-knife at the bottom) |
-| See the mosaic-effect finding | [`figures/mosaic_k_distribution.png`](figures/mosaic_k_distribution.png) (1,268 / 1,268 TAB docs uniquely identifiable) |
+| See the mosaic-effect finding | [`figures/mosaic_reidentification.png`](figures/mosaic_reidentification.png) (95% of docs unique from 3 quasi-facts; 1,268 / 1,268 at the full fingerprint) |
 | Understand the system architecture | [`figures/pipeline_architecture.png`](figures/pipeline_architecture.png) and [`figures/round_trip_threat_model.png`](figures/round_trip_threat_model.png) |
 | See the experimental setup and the EDA | [`notebooks/01_problem_setup.ipynb`](notebooks/01_problem_setup.ipynb) |
 | Reproduce the Phase 1 baseline | [`notebooks/02_baseline_evaluation.ipynb`](notebooks/02_baseline_evaluation.ipynb) |
 | Reproduce the mosaic-effect analysis | [`notebooks/03_mosaic_effect.ipynb`](notebooks/03_mosaic_effect.ipynb) |
 | Reproduce the RoBERTa fine-tune (best model) | [`phase2_baseline_comparison/03_finetune_roberta.ipynb`](phase2_baseline_comparison/03_finetune_roberta.ipynb) |
+| See a real before/after redaction | `demo/worked_example.py` (one doc through Lite · Pro · pseudonymise) |
 | Try the pipeline locally | `./demo/run_gradio.sh` (Gradio at `localhost:7860`) |
 | Reuse the code in your own project | `from anonymisation import ...` (see `src/anonymisation/__init__.py`) |
 

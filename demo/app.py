@@ -328,6 +328,7 @@ def build_ui():
                 examples=examples,
                 inputs=[input_text, variant, k_target, max_iters, pseudonymise, coref_extend],
                 label="Pre-canned examples",
+                cache_examples=False,  # caching needs fn+outputs and slows cold start
             )
 
         run_btn.click(

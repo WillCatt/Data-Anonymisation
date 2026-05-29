@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Bootstrap + launch the Gradio demo in its own isolated venv.
 #
-# First run creates demo/venv-gradio/, installs the pinned dependencies
-# from demo/requirements-gradio.txt, and downloads en_core_web_sm.
+# First run creates demo/venv-gradio/ and installs the pinned dependencies
+# from demo/requirements-gradio.txt (which includes the en_core_web_sm wheel).
 # Subsequent runs just activate the venv and launch.
 #
 # Why a separate venv?  The repo's main venv has spaCy 3.7 + the Phase 2
@@ -36,8 +36,9 @@ if [[ ! -d "$VENV" ]]; then
     export SSL_CERT_FILE="$(${PYTHON} -c 'import ssl; print(ssl.get_default_verify_paths().cafile or "")')"
 
     "$VENV/bin/python" -m pip install --upgrade pip
+    # requirements-gradio.txt pins the en_core_web_sm wheel directly, so the
+    # model installs here too — no separate (and flaky) `spacy download` step.
     "$VENV/bin/python" -m pip install -r "$REQS"
-    "$VENV/bin/python" -m spacy download en_core_web_sm
 
     echo "── Bootstrap complete ──"
 fi

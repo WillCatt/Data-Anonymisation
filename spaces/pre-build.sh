@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# HuggingFace Spaces runs this once per image build. Downloads the spaCy
-# model into the Space's persistent venv so `app.py`'s `spacy.load()` works.
+# The spaCy model (en_core_web_sm) is now pinned as a direct wheel in
+# requirements.txt, which HF Spaces installs automatically — so no model
+# download is needed here. This script is kept as a safe no-op so older deploy
+# notes that reference it don't break.
 set -euo pipefail
-python -m spacy download en_core_web_sm
+echo "en_core_web_sm installs via requirements.txt — nothing to pre-build."

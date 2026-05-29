@@ -4,11 +4,12 @@ emoji: 🔒
 colorFrom: blue
 colorTo: gray
 sdk: gradio
-sdk_version: "4.44.0"
+sdk_version: "4.26.0"
+python_version: "3.11"
 app_file: app.py
 pinned: false
 license: mit
-short_description: Lite vs Pro redaction pipelines for legal text. Phase 1–5 of the data-anonymisation project.
+short_description: Lite vs Pro PII redaction for legal text
 ---
 
 # Legal Text Anonymisation — HuggingFace Spaces deployment
