@@ -80,7 +80,7 @@ def redact(text: str, variant: str, k_target: int, max_iters: int,
 
     predictor, _ = _get_predictor()
 
-    if variant == "Lite (DIRECT only)":
+    if variant.startswith("Redact"):
         pipeline = LitePipeline(
             ner_provider=predictor,
             coref_extend=coref_extend,
@@ -96,7 +96,7 @@ def redact(text: str, variant: str, k_target: int, max_iters: int,
     result = pipeline(text)
 
     parts: List[str] = []
-    if variant.startswith("Pro"):
+    if variant.startswith("Anonymise"):
         ck = "✓ converged" if result.converged else "✗ fallback to suppression"
         parts.append(
             f"**Mosaic risk:** k_initial = `{result.mosaic_risk_initial}` → "
@@ -105,7 +105,7 @@ def redact(text: str, variant: str, k_target: int, max_iters: int,
         )
     if pseudonymise:
         parts.append(f"**Vault:** {len(result.pseudonym_vault)} entries (see Vault tab)")
-    status = "  ·  ".join(parts) if parts else "_(no status — Lite plain redaction)_"
+    status = "  ·  ".join(parts) if parts else "_(no status — Redact mode: direct identifiers only)_"
 
     if result.pseudonym_vault:
         vault_md = "| Token | Original surface form |\n|---|---|\n" + "\n".join(
@@ -130,7 +130,7 @@ def _load_examples() -> List[List]:
     return [
         [
             path.read_text().strip(),
-            "Pro (mosaic-aware)", 5, 3, False, True,
+            "Anonymise (mosaic-aware)", 5, 3, False, True,
         ]
         for path in sorted(examples_dir.glob("*.txt"))
     ]
@@ -139,22 +139,29 @@ def _load_examples() -> List[List]:
 DESCRIPTION = """\
 # Legal Text Anonymisation
 
-A redaction pipeline for legal text. Paste a document on the left and pick
-a redaction strategy. The full per-decision audit log is on the **Audit log** tab.
+> ⚠️ **This is a lightweight version of the full project.** To boot quickly on a
+> free CPU, this demo runs spaCy's small `en_core_web_sm` model for name
+> detection, so it *will* miss names the full project catches. The real pipeline
+> uses a RoBERTa model fine-tuned on legal text (F1 0.85 vs ~0.4 here) — see the
+> [portfolio write-up](https://github.com/WillCatt/Data-Anonymisation) for the
+> full results. What's faithful here is the *logic*: the redaction modes, the
+> mosaic re-identification scoring, and the audit trail.
 
-- **Lite** — strips DIRECT identifiers (names, organisations, case numbers, IBANs).
-- **Pro** — DIRECT redaction + mosaic-aware QUASI generalisation. Iteratively
-  broadens dates, locations, demographics until the document's residual fingerprint
-  reaches the target k-anonymity.
-- **Pseudonymise** — assigns referential tokens (`[PERSON_A]`, `[PERSON_B]` …)
-  instead of plain `[PERSON]`. The vault tab shows the mapping; restore() can
-  reverse it locally so an LLM's answer comes back with real names.
+Paste a document on the left and pick a mode. The full per-decision audit log is
+on the **Audit log** tab.
 
-> Portfolio demo. Source: [github.com/wcatt98/data-anonymisation](https://github.com/wcatt98/data-anonymisation).
+- **Redact** — removes the direct identifiers (names, organisations, case and
+  reference numbers, IBANs). The quick option.
+- **Anonymise** — Redact, plus mosaic-aware generalisation: it broadens the
+  remaining everyday details (dates, places, demographics) one step at a time
+  until the document's residual fingerprint is no longer unique (reaches the
+  target k-anonymity), so it can't be traced back to one person.
+- **Pseudonymise** — assigns stable referential tokens (`[PERSON_A]`, `[PERSON_B]` …)
+  instead of plain `[PERSON]`. The Vault tab shows the mapping; restore() reverses
+  it locally so an external LLM's answer comes back with the real names.
+
 > The mosaic scorer compares against the TAB corpus (1,268 ECHR cases) as a
-> methodological stand-in for a firm's own document corpus. NER backbone here is
-> spaCy `en_core_web_sm` for fast Space boot — the full project uses a RoBERTa
-> fine-tune on TAB train (Phase 2).
+> methodological stand-in for a firm's own document corpus.
 """
 
 
@@ -183,13 +190,13 @@ def build_ui():
                     lines=14,
                 )
                 variant = gr.Radio(
-                    choices=["Lite (DIRECT only)", "Pro (mosaic-aware)"],
-                    value="Pro (mosaic-aware)",
-                    label="Pipeline variant",
+                    choices=["Redact (direct identifiers)", "Anonymise (mosaic-aware)"],
+                    value="Anonymise (mosaic-aware)",
+                    label="Mode",
                 )
                 with gr.Row():
-                    k_target = gr.Slider(2, 10, value=5, step=1, label="Pro: k_target")
-                    max_iters = gr.Slider(1, 5, value=3, step=1, label="Pro: max iterations")
+                    k_target = gr.Slider(2, 10, value=5, step=1, label="Anonymise: k_target")
+                    max_iters = gr.Slider(1, 5, value=3, step=1, label="Anonymise: max iterations")
                 with gr.Row():
                     pseudonymise = gr.Checkbox(value=False, label="Pseudonymise")
                     coref_extend = gr.Checkbox(value=True, label="Coref extension")
