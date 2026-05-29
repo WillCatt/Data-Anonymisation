@@ -9,7 +9,7 @@ python_version: "3.11"
 app_file: app.py
 pinned: false
 license: mit
-short_description: Lite vs Pro PII redaction for legal text
+short_description: Redact vs Anonymise PII redaction for legal text
 ---
 
 # Legal Text Anonymisation — HuggingFace Spaces deployment
