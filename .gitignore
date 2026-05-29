@@ -45,6 +45,9 @@ models/
 data/raw/
 data/cache/
 
+# --- Phase 6.2 prediction cache (4.5MB, reproducible via scripts/cache_predictions.py) ---
+phase6_advanced_training/results/predictions_cache.json
+
 # --- macOS ---
 .DS_Store
 
