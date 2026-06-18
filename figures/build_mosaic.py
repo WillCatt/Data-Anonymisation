@@ -1,23 +1,27 @@
 """
 Build the mosaic / re-identification figure for Act I of the writeup.
 
-The old `mosaic_k_distribution.png` plotted the distribution of k across
-documents — but every TAB document is unique (k=1), so the "distribution"
-was a single bar. It stated the conclusion without showing the mechanism.
+This is the *hardened* version of the analysis. The first cut matched
+fingerprints on raw surface form and revealed a document's quasi-identifiers
+in the order they happen to appear — both of which a real attacker ignores.
+This version closes that gap and measures how much it matters:
 
-This script replaces it with two panels that actually carry insight:
+  (a) Re-identification curves — fraction of documents uniquely identifiable
+      as an attacker learns more quasi-identifiers, under two strategies:
+        * document order  — facts revealed as they appear (the naive curve);
+        * smart attacker  — the most-discriminating (globally rarest) facts
+          first, which is what someone actually trying to re-identify does.
+      Both run on *normalised* facts, so surface variants of the same fact
+      ("47-year-old" / "aged 47", "12 March 2018" / "in 2018") collide — the
+      conservative choice, since it can only make documents look less unique.
 
-  (a) Re-identification curve — as an attacker learns more of a document's
-      quasi-identifiers (the first n distinct QUASI facts in document order),
-      what fraction of documents become uniquely identifiable? The curve
-      rises from "lots of collisions" at n=1 to ~100% within a handful of
-      facts. This is also the strictness/sensitivity analysis the project
-      wanted: it shows *how fast* uniqueness emerges, not just that it does.
+  (b) Minimum-facts histogram — for each document, the fewest facts the smart
+      attacker needs to single it out. The mass sits at one or two facts.
 
-  (b) Signature-size histogram — how many distinct quasi-identifiers each
-      document carries (median ≈ 25). This is *why* the full fingerprint is
-      always unique: the joint distribution of ~25 demographic facts is
-      effectively a hash.
+The uniqueness test is the honest one: a document is identified once *no other
+document contains all the revealed facts*. Under that test a handful of
+documents are never unique (their whole fingerprint is a subset of another's) —
+reported rather than hidden.
 
 Run with:
     legal-anon-env/bin/python figures/build_mosaic.py
@@ -33,7 +37,7 @@ from __future__ import annotations
 import sys
 from collections import Counter
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -43,6 +47,10 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))  # package isn't installed; mirror the notebooks
 
 from anonymisation.data import load_tab  # noqa: E402
+from anonymisation.mosaic import (  # noqa: E402
+    min_facts_to_identify,
+    normalise_quasi_value,
+)
 
 sns.set_theme(style="whitegrid", font_scale=0.95)
 
@@ -50,23 +58,25 @@ sns.set_theme(style="whitegrid", font_scale=0.95)
 # the rest of the project uses (anonymisation.mosaic.quasi_identifier_signature).
 QUASI_TYPES = ("DEM", "DATETIME", "LOC", "QUANTITY")
 
-ACCENT = "#d73a49"   # the project's "mosaic / risk" red
+ACCENT = "#d73a49"   # the project's "mosaic / risk" red — the smart attacker
+MUTED = "#e8a3a3"    # the naive document-order curve
 GREY = "#95a5a6"
 
+Fact = Tuple[str, str]
+
 
 # ---------------------------------------------------------------------------
-# Build, per document, the ordered list of distinct quasi-identifiers
+# Per document: normalised quasi-identifiers, ordered by first appearance
 # ---------------------------------------------------------------------------
-def ordered_quasi_by_doc(docs) -> Dict[str, List[Tuple[str, str]]]:
+def ordered_quasi_by_doc(docs) -> Dict[str, List[Fact]]:
     """
-    For each doc_id, return its QUASI mentions as (entity_type, text.lower())
+    For each doc_id, return its normalised QUASI facts as (entity_type, value)
     pairs, deduplicated and ordered by first appearance in the document.
 
-    Mentions are unioned across annotators (TAB ships multiple annotator
-    entries per doc_id); first-appearance offset breaks ties for ordering.
+    Mentions are unioned across annotators (TAB ships multiple annotator entries
+    per doc_id); first-appearance offset breaks ties for ordering.
     """
-    # doc_id -> {(type, text): earliest_start_offset}
-    first_seen: Dict[str, Dict[Tuple[str, str], int]] = {}
+    first_seen: Dict[str, Dict[Fact, int]] = {}
     for doc in docs:
         bucket = first_seen.setdefault(doc["doc_id"], {})
         for em in doc["entity_mentions"]:
@@ -74,42 +84,64 @@ def ordered_quasi_by_doc(docs) -> Dict[str, List[Tuple[str, str]]]:
                 continue
             if em["entity_type"] not in QUASI_TYPES:
                 continue
-            key = (em["entity_type"], em["span_text"].strip().lower())
+            value = normalise_quasi_value(em["entity_type"], em["span_text"])
+            if not value:
+                continue
+            key = (em["entity_type"], value)
             start = em["start_offset"]
             if key not in bucket or start < bucket[key]:
                 bucket[key] = start
 
-    ordered: Dict[str, List[Tuple[str, str]]] = {}
+    ordered: Dict[str, List[Fact]] = {}
     for doc_id, keys in first_seen.items():
         ordered[doc_id] = [k for k, _ in sorted(keys.items(), key=lambda kv: kv[1])]
-    return ordered
+    return {d: q for d, q in ordered.items() if q}  # need ≥1 fact to fingerprint
 
 
 # ---------------------------------------------------------------------------
-# Re-identification curve
+# Re-identification: facts needed to single a document out
 # ---------------------------------------------------------------------------
-def uniqueness_curve(
-    quasi_by_doc: Dict[str, List[Tuple[str, str]]],
-    max_n: int = 30,
-) -> Tuple[List[int], List[float], int]:
-    """
-    For each n in 1..max_n, truncate every document's fingerprint to its
-    first n distinct quasi-identifiers and report the fraction of documents
-    that are unique (k=1) under that truncated fingerprint.
-    """
-    docs = [q for q in quasi_by_doc.values() if q]  # need ≥1 quasi to fingerprint
-    n_docs = len(docs)
-    ns, fracs = [], []
-    for n in range(1, max_n + 1):
-        sigs = [tuple(sorted(set(q[:n]))) for q in docs]
-        counts = Counter(sigs)
-        unique = sum(1 for s in sigs if counts[s] == 1)
-        ns.append(n)
-        fracs.append(100.0 * unique / n_docs)
-    return ns, fracs, n_docs
+def _facts_needed_in_order(ordered_facts: List[Fact], others: List[set]) -> Optional[int]:
+    """How many facts, revealed in the given order, until no other doc holds them all."""
+    candidates = others
+    for i, fact in enumerate(ordered_facts, start=1):
+        candidates = [d for d in candidates if fact in d]
+        if not candidates:
+            return i
+    return None
 
 
-def _first_crossing(ns: List[int], fracs: List[float], threshold: float) -> int | None:
+def reidentification_counts(
+    quasi_by_doc: Dict[str, List[Fact]],
+) -> Tuple[List[Optional[int]], List[Optional[int]]]:
+    """
+    For every document return (facts_needed_document_order, facts_needed_smart).
+
+    Smart order reuses the tested library greedy (rarest relevant fact first).
+    """
+    items = list(quasi_by_doc.items())
+    sets = [set(facts) for _, facts in items]
+
+    doc_order: List[Optional[int]] = []
+    smart: List[Optional[int]] = []
+    for i, (_doc_id, facts) in enumerate(items):
+        others = sets[:i] + sets[i + 1:]
+        doc_order.append(_facts_needed_in_order(facts, others))
+        smart.append(min_facts_to_identify(facts, others))
+    return doc_order, smart
+
+
+def cdf(counts: List[Optional[int]], n_docs: int, max_n: int) -> Tuple[List[int], List[float]]:
+    """Fraction of all documents identified within ≤ n facts (None = never)."""
+    ns = list(range(1, max_n + 1))
+    fracs = [
+        100.0 * sum(1 for c in counts if c is not None and c <= n) / n_docs
+        for n in ns
+    ]
+    return ns, fracs
+
+
+def _first_crossing(ns: List[int], fracs: List[float], threshold: float) -> Optional[int]:
     for n, f in zip(ns, fracs):
         if f >= threshold:
             return n
@@ -119,52 +151,63 @@ def _first_crossing(ns: List[int], fracs: List[float], threshold: float) -> int 
 # ---------------------------------------------------------------------------
 # Panels
 # ---------------------------------------------------------------------------
-def panel_curve(ns, fracs, n_docs, ax: plt.Axes) -> None:
-    ax.plot(ns, fracs, marker="o", markersize=4, color=ACCENT, linewidth=2)
-    ax.fill_between(ns, fracs, color=ACCENT, alpha=0.08)
+def panel_curves(ns, doc_fracs, smart_fracs, n_docs, ax: plt.Axes) -> None:
+    ax.plot(ns, doc_fracs, marker="o", markersize=3.5, color=MUTED, linewidth=1.8,
+            label="Facts in document order")
+    ax.plot(ns, smart_fracs, marker="o", markersize=4, color=ACCENT, linewidth=2.4,
+            label="Smart attacker (rarest facts first)")
+    ax.fill_between(ns, smart_fracs, color=ACCENT, alpha=0.07)
 
-    # Mark the 50% and 95% crossings — the "how fast" of the story.
-    for thr, style in ((50, ":"), (95, "--")):
-        n_cross = _first_crossing(ns, fracs, thr)
-        if n_cross is not None:
-            ax.axvline(n_cross, color=GREY, linestyle=style, linewidth=1)
-            ax.annotate(
-                f"{thr}% unique\nby {n_cross} fact{'s' if n_cross != 1 else ''}",
-                xy=(n_cross, thr), xytext=(n_cross + 1.2, thr - 14),
-                fontsize=8.5, color="#586069",
-                arrowprops=dict(arrowstyle="-", color=GREY, linewidth=0.8),
-            )
-
-    ax.set_xlim(1, max(ns))
-    ax.set_ylim(0, 103)
-    ax.set_xlabel("Quasi-identifiers known to the attacker (first n distinct facts)")
-    ax.set_ylabel("Documents uniquely identifiable (%)")
-    ax.set_title(
-        "How fast a document becomes unique\n"
-        f"(QUASI fingerprint only, after a perfect DIRECT redaction · n={n_docs:,} docs)",
-        fontweight="bold", fontsize=12, pad=10,
-    )
-    ax.set_axisbelow(True)
-
-
-def panel_sizes(quasi_by_doc: Dict[str, List[Tuple[str, str]]], ax: plt.Axes) -> None:
-    sizes = [len(q) for q in quasi_by_doc.values() if q]
-    median = int(np.median(sizes))
-    ax.hist(sizes, bins=range(0, max(sizes) + 3, 2), color=GREY,
-            edgecolor="white", alpha=0.9)
-    ax.axvline(median, color=ACCENT, linewidth=2)
+    one = smart_fracs[0]
     ax.annotate(
-        f"median = {median} distinct\nquasi-identifiers / doc",
-        xy=(median, ax.get_ylim()[1] * 0.6),
-        xytext=(median + 4, ax.get_ylim()[1] * 0.7),
+        f"{one:.0f}% unique\nfrom 1 fact",
+        xy=(1, one), xytext=(2.2, one - 20),
         fontsize=9, color=ACCENT, fontweight="bold",
         arrowprops=dict(arrowstyle="->", color=ACCENT, linewidth=1),
     )
-    ax.set_xlabel("Distinct quasi-identifiers per document")
+    n95 = _first_crossing(ns, doc_fracs, 95)
+    if n95 is not None:
+        ax.annotate(
+            f"document order needs\n{n95} facts for 95%",
+            xy=(n95, 95), xytext=(n95 + 1.0, 60),
+            fontsize=8.5, color="#586069",
+            arrowprops=dict(arrowstyle="-", color=GREY, linewidth=0.8),
+        )
+
+    ax.set_xlim(1, max(ns))
+    ax.set_ylim(0, 103)
+    ax.set_xlabel("Quasi-identifiers known to the attacker")
+    ax.set_ylabel("Documents uniquely identifiable (%)")
+    ax.set_title(
+        "How fast a document becomes unique\n"
+        f"(normalised QUASI facts, after a perfect DIRECT redaction · n={n_docs:,} docs)",
+        fontweight="bold", fontsize=12, pad=10,
+    )
+    ax.legend(loc="lower right", fontsize=9, frameon=True)
+    ax.set_axisbelow(True)
+
+
+def panel_min_facts(smart: List[Optional[int]], n_docs: int, ax: plt.Axes) -> None:
+    unique = [c for c in smart if c is not None]
+    never = sum(1 for c in smart if c is None)
+    median = int(np.median(unique))
+    top = max(unique)
+
+    ax.hist(unique, bins=range(1, top + 2), color=ACCENT, edgecolor="white",
+            alpha=0.85, align="left", rwidth=0.9)
+    ax.axvline(median, color="#586069", linewidth=2, linestyle="--")
+    ax.annotate(
+        f"median = {median} fact",
+        xy=(median, ax.get_ylim()[1] * 0.7),
+        xytext=(median + 1.5, ax.get_ylim()[1] * 0.78),
+        fontsize=9, color="#586069", fontweight="bold",
+        arrowprops=dict(arrowstyle="->", color="#586069", linewidth=1),
+    )
+    ax.set_xlabel("Fewest facts a smart attacker needs to single out the document")
     ax.set_ylabel("Number of documents")
     ax.set_title(
-        "Why the full fingerprint is always unique\n"
-        "(the joint distribution of ~25 facts is effectively a hash)",
+        "Re-identification is usually a one-fact problem\n"
+        f"({never} of {n_docs:,} docs are never unique — a superset fingerprint hides them)",
         fontweight="bold", fontsize=12, pad=10,
     )
     ax.set_axisbelow(True)
@@ -176,25 +219,32 @@ def panel_sizes(quasi_by_doc: Dict[str, List[Tuple[str, str]]], ax: plt.Axes) ->
 def main() -> None:
     print("Loading TAB …")
     ds = load_tab()
-    # Use the whole corpus (all splits) — the headline is "1,268 / 1,268".
     docs = [d for split in ds for d in ds[split]]
     print(f"  {len(docs):,} annotator rows across {len(ds)} splits")
 
     quasi_by_doc = ordered_quasi_by_doc(docs)
-    ns, fracs, n_docs = uniqueness_curve(quasi_by_doc)
+    n_docs = len(quasi_by_doc)
+    print(f"  {n_docs:,} documents with ≥1 normalised quasi-identifier")
 
-    full_unique = fracs[-1]
-    print(f"  {n_docs:,} documents with ≥1 quasi-identifier")
-    print(f"  unique at 1 fact: {fracs[0]:.1f}%   "
-          f"| at {ns[-1]} facts: {full_unique:.1f}%")
-    print(f"  50% crossing: n={_first_crossing(ns, fracs, 50)}   "
-          f"95% crossing: n={_first_crossing(ns, fracs, 95)}")
+    doc_order, smart = reidentification_counts(quasi_by_doc)
+    max_n = 20
+    ns, doc_fracs = cdf(doc_order, n_docs, max_n)
+    _, smart_fracs = cdf(smart, n_docs, max_n)
 
-    fig, (ax_curve, ax_sizes) = plt.subplots(1, 2, figsize=(15, 5.5))
-    panel_curve(ns, fracs, n_docs, ax_curve)
-    panel_sizes(quasi_by_doc, ax_sizes)
+    never = sum(1 for c in smart if c is None)
+    uniq = [c for c in smart if c is not None]
+    print(f"  smart attacker — unique from 1 fact: {smart_fracs[0]:.1f}%   "
+          f"≤3 facts: {cdf(smart, n_docs, 3)[1][-1]:.1f}%")
+    print(f"  smart attacker — median min-facts: {int(np.median(uniq))}   "
+          f"never unique: {never} ({100*never/n_docs:.1f}%)")
+    print(f"  document order — unique from 1 fact: {doc_fracs[0]:.1f}%   "
+          f"95% crossing: n={_first_crossing(ns, doc_fracs, 95)}")
+
+    fig, (ax_curve, ax_hist) = plt.subplots(1, 2, figsize=(15, 5.5))
+    panel_curves(ns, doc_fracs, smart_fracs, n_docs, ax_curve)
+    panel_min_facts(smart, n_docs, ax_hist)
     fig.suptitle(
-        "The mosaic effect — quasi-identifiers re-identify documents NER can't touch",
+        "The mosaic effect — a realistic attacker re-identifies almost everything",
         fontsize=15, fontweight="bold", y=1.02,
     )
     fig.tight_layout()

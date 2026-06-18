@@ -27,7 +27,12 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "figures"))            # import the mosaic helpers
-from build_mosaic import load_tab, ordered_quasi_by_doc, uniqueness_curve  # noqa: E402
+from build_mosaic import (  # noqa: E402
+    cdf,
+    load_tab,
+    ordered_quasi_by_doc,
+    reidentification_counts,
+)
 
 # ── Portfolio palette (matches project.css :root) ──────────────────────────
 BG      = "#faf8f4"
@@ -93,17 +98,19 @@ def chart_accuracy(out: Path) -> None:
 def chart_reidentification(out: Path) -> None:
     ds = load_tab()
     docs = [d for split in ds for d in ds[split]]
-    ns, fracs, n_docs = uniqueness_curve(ordered_quasi_by_doc(docs), max_n=8)
+    quasi = ordered_quasi_by_doc(docs)
+    _, smart = reidentification_counts(quasi)            # realistic attacker
+    ns, fracs = cdf(smart, len(quasi), max_n=8)
 
     fig, ax = plt.subplots(figsize=(8, 4.8))
     ax.plot(ns, fracs, marker="o", markersize=7, color=RED, linewidth=3)
     ax.fill_between(ns, fracs, color=RED, alpha=0.07)
 
-    # Highlight the "3 details → 95%" point
-    three = fracs[2]
-    ax.scatter([3], [three], s=170, color=RED, zorder=5, edgecolor=BG, linewidth=2)
-    ax.annotate(f"Just 3 ordinary details\nidentify {three:.0f}% of people",
-                xy=(3, three), xytext=(3.4, three - 34),
+    # Highlight the "1 telling detail → 81%" point
+    one = fracs[0]
+    ax.scatter([1], [one], s=170, color=RED, zorder=5, edgecolor=BG, linewidth=2)
+    ax.annotate(f"Just one distinctive detail\nidentifies {one:.0f}% of people",
+                xy=(1, one), xytext=(1.6, one - 40),
                 fontsize=12.5, fontweight="bold", color=RED,
                 arrowprops=dict(arrowstyle="->", color=RED, linewidth=1.6))
 
@@ -124,7 +131,7 @@ def chart_reidentification(out: Path) -> None:
     fig.tight_layout()
     fig.savefig(out, dpi=140, bbox_inches="tight")
     plt.close(fig)
-    print(f"  → {out.relative_to(ROOT)}  (3 details → {three:.0f}%)")
+    print(f"  → {out.relative_to(ROOT)}  (1 detail → {one:.0f}%)")
 
 
 def main() -> None:
