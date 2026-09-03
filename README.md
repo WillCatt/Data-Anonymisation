@@ -220,6 +220,8 @@ The honest summary is uncomfortable and worth stating plainly: **the choices tha
 
 *Not yet applied.* Aligning the predictor's de-duplication with the pipeline's would change every reported number in this repo, so it is documented rather than silently patched — it is the top item in [Limits and next](#limits-and-next).
 
+Walkthrough: [`notebooks/16_ablations.ipynb`](notebooks/16_ablations.ipynb) — runs in seconds, replays cached counts, loads no models.
+
 Reproduce: `python scripts/ablate_inference_config.py` · `python scripts/ablate_postprocessing.py` · `python scripts/ablate_training.py --seeds 42 43 44 45 46`
 
 ---
@@ -241,7 +243,7 @@ Reproduce: `python scripts/ablate_inference_config.py` · `python scripts/ablate
 │   ├── mosaic.py             the re-identification analysis
 │   ├── evaluation.py         span P/R/F1, partial + exact
 │   └── cli.py                `anonymise redact` / `anonymise restore`
-├── notebooks/                01–15, in narrative order (see above)
+├── notebooks/                01–16, in narrative order (see above)
 ├── scripts/                  runnable analysis + figure builders
 ├── results/                  every metric CSV/JSON, one place
 ├── figures/                  generated charts and diagrams
