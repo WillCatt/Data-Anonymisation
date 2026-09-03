@@ -66,19 +66,21 @@ The two controls this project arrived at — a minimum group size before anythin
 
 Partial-match span F1 on the 555-document TAB test split. Every model runs behind the same predictor contract and is scored by the same code, so the numbers are directly comparable.
 
+The table reports the **fine-tune notebooks'** runs (inference `max_length=384`). The confidence intervals below are measured from the **prediction cache** (`max_length=512`), which scores both fine-tunes ~0.5 pp higher for the reason documented under [the resolved discrepancy](#results). Same checkpoints, same gold, same matcher — different sliding-window size. Rankings are unaffected.
+
 | Model | Partial F1 | Exact F1 | Note |
 |---|---|---|---|
 | spaCy `en_core_web_trf` | 0.5656 | 0.3807 | baseline · CODE recall **0.0** |
 | `dslim/bert-base-NER` | 0.1669 | 0.0546 | CoNLL label set discards most of TAB — not a meaningful comparison |
 | Presidio (stock) | 0.6024 | 0.4252 | ORG precision 0.13 |
 | Presidio + CASE_NUMBER | 0.6031 | 0.4249 | regex fixes CODE; ORG noise dominates |
-| **RoBERTa fine-tuned** | **0.8510** | **0.7842** | **best** |
+| **RoBERTa fine-tuned** | **0.8510** | **0.7842** | best point estimate — but see the paired test below |
 | LegalBERT fine-tuned | 0.8486 | 0.7847 | tie — see null #2 |
 | Ensemble, union (min 1) | 0.5530 | 0.4793 | backfired — see null #3 |
 | Ensemble, consensus (min 3) | 0.7949 | 0.7220 | recovers, still loses |
 | Routed (per-label best) | 0.8538 | 0.7902 | collapses to a single model |
 
-**Confidence intervals.** Bootstrapped over the 555 test documents (10,000 resamples, documents as the resampling unit — spans within a document are correlated, so resampling spans would give intervals that are far too narrow):
+**Confidence intervals** *(from the prediction cache, `max_length=512`)*. Bootstrapped over the 555 test documents (10,000 resamples, documents as the resampling unit — spans within a document are correlated, so resampling spans would give intervals that are far too narrow):
 
 | Model | Partial F1 | 95% CI |
 |---|---|---|
