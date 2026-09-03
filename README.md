@@ -115,6 +115,68 @@ Three measured nulls, kept in the repo on purpose.
 
 ---
 
+## Ablations: which knobs actually moved the number
+
+Reconciling the LegalBERT discrepancy raised an uncomfortable question. If a tokenisation setting was worth 0.5 pp, and the gap between the two backbones was 0.2 pp and not statistically distinguishable, then **what was actually driving the score?** So I swept it properly.
+
+### Inference window and overlap
+
+Long documents are processed as overlapping sliding windows. `max_length` sets the window, `stride` the overlap. Neither needs retraining — this is pure inference-time data preparation.
+
+| max_length | stride | Partial F1 | 95% CI | Δ vs trained config | real? | predictions |
+|---|---|---|---|---|---|---|
+| 512 | 0 | **0.8624** | [0.8536, 0.8710] | +0.0113 | yes | 20,913 |
+| 384 | 0 | 0.8616 | [0.8534, 0.8698] | +0.0106 | yes | 20,912 |
+| 256 | 0 | 0.8560 | [0.8480, 0.8640] | +0.0049 | yes | 20,698 |
+| 512 | 64 | 0.8559 | [0.8475, 0.8644] | +0.0049 | yes | 21,336 |
+| 512 | 128 | 0.8519 | [0.8433, 0.8605] | +0.0009 | no | 21,561 |
+| 384 | 64 | 0.8510 | [0.8426, 0.8593] | — *(as trained)* | — | 21,460 |
+| 256 | 64 | 0.8413 | [0.8330, 0.8496] | −0.0097 | yes | 22,071 |
+| 384 | 128 | 0.8393 | [0.8307, 0.8480] | −0.0117 | yes | 22,121 |
+| 256 | 128 | 0.8219 | [0.8134, 0.8305] | −0.0291 | yes | 23,161 |
+
+**Spread across configs: 0.0405 F1 — eighteen times the 0.0022 gap between the two fine-tuned backbones.** The sweep also reproduces the notebook's headline 0.8510 exactly at the config it was trained with, which is what makes the rest of the table trustworthy rather than harness drift.
+
+Overlap is monotonically harmful at every window size, and prediction count rises with it: 20,913 spans at stride 0 against 23,161 at the worst setting. More overlap, more spans, more false positives.
+
+### The mechanism — and why the fix isn't "tune the window"
+
+Overlap exists for a good reason: it stops entities being split at a window boundary. It backfires here because of a de-duplication mismatch between two parts of the codebase:
+
+- `predictors.make_finetuned_predictor` drops **exact** duplicates — spans identical in (start, end, type). **Every reported F1 was computed on this.**
+- `pipeline.Pipeline._dedupe_overlapping` drops **overlapping** spans, longest wins. **This is what a real document goes through.**
+
+The same entity seen in two adjacent windows comes back with slightly different boundaries. Not an exact duplicate, so evaluation keeps both and scores one as a false positive — while the product would have collapsed them into one.
+
+| Model | As evaluated | Overlap-deduped | Δ | 95% CI | real? |
+|---|---|---|---|---|---|
+| spaCy | 0.5656 | 0.5656 | +0.0000 | — | no |
+| Presidio | 0.6031 | 0.6032 | +0.0001 | [−0.0000, +0.0002] | no |
+| LegalBERT | 0.8538 | 0.8588 | +0.0051 | [+0.0044, +0.0058] | yes |
+| RoBERTa | 0.8559 | **0.8636** | +0.0077 | [+0.0068, +0.0086] | yes |
+
+382 of the 387 spans removed for RoBERTa were false positives. spaCy and Presidio are untouched because neither uses sliding windows — exactly the signature the explanation predicts.
+
+Put the two tables together and the window setting stops being interesting:
+
+```
+384/64, as trained, exact-match dedup      0.8510
+512/0,  no overlap, exact-match dedup      0.8624   +0.0113
+512/64, overlap + overlap-aware dedup      0.8636   +0.0126
+```
+
+**Overlap was never the problem. The de-duplication rule was.** Fix the dedup and the hyperparameter stops mattering — which is a better outcome than a tuned window, because it removes a setting someone would otherwise have to get right.
+
+### What this says about the project
+
+The honest summary is uncomfortable and worth stating plainly: **the choices that moved the number were not the ones that got a phase of attention.** Backbone selection was inside the noise floor. Data preparation and prediction post-processing were worth 3–18× more, and one of them was a mismatch between the evaluation path and the shipped path that no amount of model comparison would have surfaced.
+
+*Not yet applied.* Aligning the predictor's de-duplication with the pipeline's would change every reported number in this repo, so it is documented rather than silently patched — it is the top item in [Limits and next](#limits-and-next).
+
+Reproduce: `python scripts/ablate_inference_config.py` · `python scripts/ablate_postprocessing.py` · `python scripts/ablate_training.py --seeds 42 43 44 45 46`
+
+---
+
 ## Repo layout
 
 ```
@@ -204,10 +266,11 @@ anonymise redact --variant pro --pseudonymise --vault-out vault.json doc.txt
 
 **Next, in priority order.**
 1. ~~Confidence intervals and paired significance tests.~~ **Done** — see [Results](#results). The LegalBERT discrepancy is resolved and its cause fixed.
-2. **Fuzzy fingerprint matching** — sweep how the 100% finding moves as match strictness loosens. The sensitivity analysis this project most needs.
-3. **Human annotator ceiling** — establish the realistic upper bound before chasing more F1.
-4. **Cross-document pseudonymisation** — a persistent registry so the same person keeps the same token across a matter. Real key-management questions first.
-5. **CRF head on the fine-tune** — closes the 0.85 partial vs 0.78 exact-match gap.
+2. **Align the predictor's de-duplication with the pipeline's.** The evaluation path drops only exact-duplicate spans; the shipped pipeline drops overlapping ones. Worth +0.0077 F1 for RoBERTa and it makes the reported numbers describe the system that actually runs. Changes every figure in this repo, so it wants doing deliberately.
+3. **Fuzzy fingerprint matching** — sweep how the 100% finding moves as match strictness loosens. The sensitivity analysis this project most needs.
+4. **Human annotator ceiling** — establish the realistic upper bound before chasing more F1.
+5. **Cross-document pseudonymisation** — a persistent registry so the same person keeps the same token across a matter. Real key-management questions first.
+6. **CRF head on the fine-tune** — closes the 0.85 partial vs 0.78 exact-match gap.
 
 ---
 
