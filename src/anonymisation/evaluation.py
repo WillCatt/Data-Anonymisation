@@ -81,24 +81,23 @@ def _is_spacy_pipeline(obj) -> bool:
     return hasattr(obj, "pipe_names") and hasattr(obj, "__call__")
 
 
-def evaluate_document(predictor, doc: dict, mode: str = "partial") -> Dict[str, EvalResult]:
+def score_spans(
+    pred: List[Tuple[int, int, str, str]],
+    gold: List[Tuple[int, int, str, str]],
+    mode: str = "partial",
+) -> Dict[str, EvalResult]:
     """
-    Score one TAB document.
+    Score one document's predicted spans against its gold spans.
 
-    `predictor` may be either:
-      * a spaCy Language object — for backward compatibility with Phase 1; we
-        run `predict_entities(nlp, text)` to get spans, OR
-      * any callable mapping `text -> [(start, end, tab_type, span_text), ...]` —
-        which is how Phase 2's HuggingFace, Presidio and fine-tuned models plug in.
+    This is the single matcher used everywhere in the project — by
+    `evaluate_document` (which runs a live model first) and by the cache-replay
+    paths in `scripts/` (which score spans that were computed earlier). Keeping
+    one implementation is what makes numbers from those two routes comparable.
 
-    Returns {entity_type: EvalResult}.
+    Greedy first-match: each predicted span claims the first still-unmatched
+    gold span of the same type that it overlaps (or equals, when
+    `mode="exact"`). Unmatched predictions are FPs; unclaimed gold spans FNs.
     """
-    gold = extract_gold_entities(doc)
-    if _is_spacy_pipeline(predictor):
-        pred = predict_entities(predictor, doc["text"])
-    else:
-        pred = predictor(doc["text"])
-
     # Defensive: predictors must produce only TAB types we know how to score.
     pred = [(s, e, t, txt) for (s, e, t, txt) in pred if t in TAB_TO_SPACY]
 
@@ -126,6 +125,25 @@ def evaluate_document(predictor, doc: dict, mode: str = "partial") -> Dict[str, 
             results["_ALL"].fn += 1
 
     return results
+
+
+def evaluate_document(predictor, doc: dict, mode: str = "partial") -> Dict[str, EvalResult]:
+    """
+    Score one TAB document by running `predictor` over its text.
+
+    `predictor` may be either:
+      * a spaCy Language object — we run `predict_entities(nlp, text)`, OR
+      * any callable mapping `text -> [(start, end, tab_type, span_text), ...]`,
+        which is how the HuggingFace, Presidio and fine-tuned models plug in.
+
+    Returns {entity_type: EvalResult}.
+    """
+    gold = extract_gold_entities(doc)
+    if _is_spacy_pipeline(predictor):
+        pred = predict_entities(predictor, doc["text"])
+    else:
+        pred = predictor(doc["text"])
+    return score_spans(pred, gold, mode)
 
 
 def merge_results(per_doc: List[Dict[str, EvalResult]]) -> Dict[str, EvalResult]:

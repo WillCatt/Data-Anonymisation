@@ -30,9 +30,7 @@ sys.path.insert(0, str(REPO / "src"))
 import pandas as pd
 
 from anonymisation.ensemble import EnsemblePredictor
-from anonymisation.evaluation import (
-    EvalResult, _empty_results, merge_results, spans_overlap,
-)
+from anonymisation.evaluation import EvalResult, merge_results, score_spans
 from anonymisation.mapping import TAB_TO_SPACY
 
 CACHE = REPO / "results/predictions_cache.json"
@@ -47,35 +45,9 @@ def as_spans(raw: List[list]) -> List[Span]:
     return [(int(s), int(e), t, txt) for s, e, t, txt in raw]
 
 
-def score(pred: List[Span], gold: List[Span], mode: str = "partial") -> Dict[str, EvalResult]:
-    """Score one document's predicted spans against gold — mirrors evaluate_document."""
-    pred = [(s, e, t, txt) for (s, e, t, txt) in pred if t in TAB_TO_SPACY]
-    results = _empty_results()
-    gold_matched: set = set()
-    for ps, pe, pt, _ in pred:
-        matched = False
-        for gi, (gs, ge, gt, _) in enumerate(gold):
-            if gi in gold_matched:
-                continue
-            if pt == gt and spans_overlap(ps, pe, gs, ge, mode):
-                results[gt].tp += 1
-                results["_ALL"].tp += 1
-                gold_matched.add(gi)
-                matched = True
-                break
-        if not matched:
-            results[pt].fp += 1
-            results["_ALL"].fp += 1
-    for gi, (_, _, gt, _) in enumerate(gold):
-        if gi not in gold_matched:
-            results[gt].fn += 1
-            results["_ALL"].fn += 1
-    return results
-
-
 def eval_strategy(cache: List[dict], combine, mode: str = "partial") -> Dict[str, EvalResult]:
     """`combine(entry) -> List[Span]` produces the combined prediction for a doc."""
-    per_doc = [score(combine(e), as_spans(e["gold"]), mode) for e in cache]
+    per_doc = [score_spans(combine(e), as_spans(e["gold"]), mode) for e in cache]
     return merge_results(per_doc)
 
 

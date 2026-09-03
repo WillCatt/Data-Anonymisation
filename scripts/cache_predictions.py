@@ -30,6 +30,16 @@ from anonymisation.predictors import make_finetuned_predictor, build_presidio_an
 from anonymisation.device import best_device
 
 LEGALBERT_DIR = REPO / "models/legalbert-tab/final"
+
+# Inference window, stated explicitly rather than inherited from
+# make_finetuned_predictor's defaults. Leaving it implicit is what caused the
+# 0.5 pp LegalBERT discrepancy: the fine-tune notebooks pass max_length=384
+# while this path silently took the 512 default, so the same checkpoint scored
+# 0.8486 one way and 0.8538 the other. Sliding-window size changes how many
+# boundary fragments become false positives. See
+# scripts/diagnose_eval_discrepancy.py.
+MAX_LENGTH = 512
+STRIDE = 64
 OUT_PATH = REPO / "results/predictions_cache.json"
 
 
@@ -52,7 +62,9 @@ def build_predictors():
     print(f"  device = {device} (forced; MPS leaks over the long loop)", flush=True)
     tok = AutoTokenizer.from_pretrained(str(LEGALBERT_DIR))
     model = AutoModelForTokenClassification.from_pretrained(str(LEGALBERT_DIR))
-    legalbert_predict = make_finetuned_predictor(model, tok, device=device)
+    legalbert_predict = make_finetuned_predictor(
+        model, tok, device=device, max_length=MAX_LENGTH, stride=STRIDE
+    )
 
     print("Building Presidio analyzer (en_core_web_lg backbone + CASE_NUMBER) …", flush=True)
     analyzer = build_presidio_analyzer(add_case_number_recognizer=True, spacy_model="en_core_web_lg")

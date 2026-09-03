@@ -17,7 +17,7 @@ Anchored in the [Text Anonymization Benchmark](https://github.com/NorskRegnesent
 ## Three findings
 
 1. **Off-the-shelf NER is not close.** spaCy's strongest English model scores **0.566 partial-match F1** on TAB, with **0% recall on case-file numbers** — that label doesn't exist in its vocabulary. The failure is categorical, not marginal.
-2. **Fine-tuning closes the detection gap.** RoBERTa fine-tuned on TAB reaches **0.851 F1** (+28.5 pp), and the lift lands exactly where TAB's label set diverges from newswire NER.
+2. **Fine-tuning closes the detection gap.** RoBERTa fine-tuned on TAB reaches **0.856 F1, 95% CI [0.848, 0.864]** (+29 pp), and the lift lands exactly where TAB's label set diverges from newswire NER. LegalBERT, despite 12 GB of legal pretraining, is statistically indistinguishable from it.
 3. **It doesn't matter.** Assume a *perfect* detector; mask every direct identifier. **All 1,268 documents remain uniquely identifiable** from their residual quasi-identifier fingerprint — age, nationality, occupation, location, dates. Median fingerprint: 25 facts. The joint distribution of 25 ordinary details behaves like a hash.
 
 **The consequence that shaped the product:** anonymisation is not an entity-detection problem. It needs a re-identification check, and it needs a way to keep the text *useful* after redaction.
@@ -78,7 +78,22 @@ Partial-match span F1 on the 555-document TAB test split. Every model runs behin
 | Ensemble, consensus (min 3) | 0.7949 | 0.7220 | recovers, still loses |
 | Routed (per-label best) | 0.8538 | 0.7902 | collapses to a single model |
 
-> **Known discrepancy.** LegalBERT reports 0.8486 via `results/finetune_legalbert.csv` and 0.8538 via `results/combiner_comparison.csv` — two evaluation paths, 0.5 pp apart, straddling RoBERTa's 0.8510. Reconciling this (and putting confidence intervals on every number above) is the top open item.
+**Confidence intervals.** Bootstrapped over the 555 test documents (10,000 resamples, documents as the resampling unit — spans within a document are correlated, so resampling spans would give intervals that are far too narrow):
+
+| Model | Partial F1 | 95% CI |
+|---|---|---|
+| spaCy `en_core_web_trf` | 0.5656 | [0.5544, 0.5764] |
+| Presidio + CASE_NUMBER | 0.6031 | [0.5927, 0.6133] |
+| LegalBERT fine-tuned | 0.8538 | [0.8432, 0.8638] |
+| **RoBERTa fine-tuned** | **0.8559** | **[0.8475, 0.8644]** |
+
+**Is RoBERTa actually better than LegalBERT?** No — and this is now tested rather than asserted. Paired bootstrap on identical resampled documents gives **Δ = −0.0022, 95% CI [−0.0080, +0.0029], permutation p = 0.43**. Zero sits comfortably inside the interval. Every other pairing *is* distinguishable (all p ≈ 0.0001), including Presidio over spaCy.
+
+Note the paired interval (±0.005) is half the width of either model's own interval (±0.010). That is the point of pairing: both models face the same documents each resample, so "this batch happened to be easy" cancels out. Overlapping individual intervals would not have settled the question either way.
+
+> **Resolved: the 0.5 pp LegalBERT discrepancy.** The same checkpoint scored 0.8486 in `finetune_legalbert.csv` and 0.8538 in `combiner_comparison.csv` — straddling RoBERTa's reported 0.8510, so *which CSV you quoted decided which model won*. Cause: an inference-config mismatch, not a metric bug. The fine-tune notebooks pass `max_length=384`; the cache-replay path silently took `make_finetuned_predictor`'s `512` default. Smaller windows fragment spans at chunk boundaries and those fragments score as false positives — measured at **+0.0063 F1** for 512 over 384, with identical gold both ways ([`scripts/diagnose_eval_discrepancy.py`](scripts/diagnose_eval_discrepancy.py)). Both fine-tunes were affected equally, so the tie between them held either way — but only by luck. The window is now pinned explicitly in both cache scripts.
+
+Reproduce: `python scripts/bootstrap_ci.py --mode both` → [`results/bootstrap_ci.csv`](results/bootstrap_ci.csv), [`results/paired_comparisons.csv`](results/paired_comparisons.csv).
 
 **Re-identification:** 1,268 / 1,268 TAB documents have k = 1 on the QUASI fingerprint; median signature 25 mentions. Exact surface-form matching — see [Limits](#limits-and-next).
 
@@ -186,7 +201,7 @@ anonymise redact --variant pro --pseudonymise --vault-out vault.json doc.txt
 - **Text in, text out.** No PDF/DOCX extraction, no layout handling, no cross-document linking, no service packaging.
 
 **Next, in priority order.**
-1. **Confidence intervals and paired significance tests** on every headline number. Several "within noise" claims in this repo have never actually been tested, and the LegalBERT discrepancy above needs resolving.
+1. ~~Confidence intervals and paired significance tests.~~ **Done** — see [Results](#results). The LegalBERT discrepancy is resolved and its cause fixed.
 2. **Fuzzy fingerprint matching** — sweep how the 100% finding moves as match strictness loosens. The sensitivity analysis this project most needs.
 3. **Human annotator ceiling** — establish the realistic upper bound before chasing more F1.
 4. **Cross-document pseudonymisation** — a persistent registry so the same person keeps the same token across a matter. Real key-management questions first.
