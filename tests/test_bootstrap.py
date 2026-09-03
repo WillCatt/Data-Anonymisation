@@ -140,9 +140,11 @@ def test_per_document_counts_are_additive_over_the_corpus():
     """Summed per-document counts must equal corpus counts — the whole method
     rests on being able to add documents up."""
     cache = [
-        {"gold": [[0, 5, "PERSON", "Alice"], [10, 15, "LOC", "Paris"]],
+        {"doc_id": "a",
+         "gold": [[0, 5, "PERSON", "Alice"], [10, 15, "LOC", "Paris"]],
          "m":    [[0, 5, "PERSON", "Alice"]]},
-        {"gold": [[0, 3, "ORG", "BBC"]],
+        {"doc_id": "b",
+         "gold": [[0, 3, "ORG", "BBC"]],
          "m":    [[0, 3, "ORG", "BBC"], [20, 25, "PERSON", "ghost"]]},
     ]
     tp, fp, fn = per_document_counts(cache, "m", "partial")
@@ -150,7 +152,54 @@ def test_per_document_counts_are_additive_over_the_corpus():
 
 
 def test_exact_mode_is_stricter_than_partial():
-    cache = [{"gold": [[0, 10, "PERSON", "Alice Smith"]],
+    cache = [{"doc_id": "a",
+              "gold": [[0, 10, "PERSON", "Alice Smith"]],
               "m":    [[0, 5, "PERSON", "Alice"]]}]      # overlaps but isn't equal
     assert per_document_counts(cache, "m", "partial")[0].sum() == 1
     assert per_document_counts(cache, "m", "exact")[0].sum() == 0
+
+
+def test_rows_sharing_a_doc_id_collapse_into_one_cluster():
+    """
+    TAB ships several annotators per document: same text, same predictions,
+    different gold. Those rows are NOT independent draws, and treating them as
+    such understates every confidence interval (measured at ~1.7x too narrow).
+    per_document_counts must return one row per unique doc_id.
+    """
+    cache = [
+        {"doc_id": "shared", "gold": [[0, 5, "PERSON", "Alice"]], "m": [[0, 5, "PERSON", "Alice"]]},
+        {"doc_id": "shared", "gold": [[0, 5, "PERSON", "Alice"]], "m": [[0, 5, "PERSON", "Alice"]]},
+        {"doc_id": "other",  "gold": [[0, 3, "ORG", "BBC"]],      "m": [[0, 3, "ORG", "BBC"]]},
+    ]
+    tp, fp, fn = per_document_counts(cache, "m", "partial")
+    assert len(tp) == 2, "three rows over two doc_ids must give two clusters"
+    assert tp.tolist() == [2, 1], "the repeated doc_id's counts must be summed"
+    assert tp.sum() == 3, "clustering must not lose observations"
+
+
+def test_clustering_widens_intervals():
+    """
+    The correction has to actually bite: pooling correlated rows into clusters
+    must produce a wider interval than treating them as independent.
+    """
+    rng = np.random.default_rng(11)
+    n_docs, per_doc = 40, 5
+    cache = []
+    for d in range(n_docs):
+        # per-document difficulty, shared by all that document's annotator rows
+        hard = rng.integers(0, 2)
+        for _ in range(per_doc):
+            g = [[0, 5, "PERSON", "x"], [6, 11, "PERSON", "y"]]
+            m = [] if hard else g
+            cache.append({"doc_id": f"d{d}", "gold": g, "m": m})
+
+    clustered = per_document_counts(cache, "m", "partial")
+    flat = tuple(np.repeat(a / per_doc, per_doc).astype(np.int64) for a in clustered)
+
+    def width(counts, n):
+        idx = rng.integers(0, n, size=(2000, n))
+        dist = bootstrap_f1(counts, idx)
+        lo, hi = np.percentile(dist, [2.5, 97.5])
+        return hi - lo
+
+    assert width(clustered, n_docs) > width(flat, n_docs * per_doc)

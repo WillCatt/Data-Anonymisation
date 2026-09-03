@@ -93,7 +93,8 @@ def main() -> None:
 
     configs = [(w, s) for w in args.windows for s in args.strides if s < w]
     print(f"Model      : {args.model}  ({model_dir})")
-    print(f"Documents  : {len(docs)}   device: {args.device}   match: {args.mode}")
+    print(f"Documents  : {len(docs)} rows over {len({d['doc_id'] for d in docs})} unique"
+          f"   device: {args.device}   match: {args.mode}")
     print(f"Configs    : {len(configs)}  = {args.windows} x {args.strides}")
     print(f"Baseline   : max_length={BASELINE[0]}, stride={BASELINE[1]} (what the notebooks trained with)\n")
 
@@ -126,12 +127,27 @@ def main() -> None:
               f"   ({time.time() - started:.0f}s)", flush=True)
 
     # ── bootstrap every config on ONE shared resample matrix ─────────────
+    # Cluster by doc_id: TAB's test rows are annotator-annotation pairs over far
+    # fewer unique documents (555 rows -> 127 docs), and resampling rows treats
+    # several views of one judgment as independent draws.
+    doc_ids = [d["doc_id"] for d in docs]
+    order, groups = [], {}
+    for i, did in enumerate(doc_ids):
+        if did not in groups:
+            groups[did] = []
+            order.append(did)
+        groups[did].append(i)
+    clusters = [groups[d] for d in order]
+    n_clusters = len(clusters)
+
     rng = np.random.default_rng(args.seed)
-    idx = rng.integers(0, len(docs), size=(args.iters, len(docs)))
+    idx = rng.integers(0, n_clusters, size=(args.iters, n_clusters))
 
     def boot(counts):
         a = np.array(counts)
-        tp, fp, fn = a[:, 0], a[:, 1], a[:, 2]
+        # collapse annotator rows into their document before resampling
+        c = np.array([a[rows].sum(axis=0) for rows in clusters])
+        tp, fp, fn = c[:, 0], c[:, 1], c[:, 2]
         return micro_f1(tp[idx].sum(1), fp[idx].sum(1), fn[idx].sum(1))
 
     base_key = f"{BASELINE[0]}|{BASELINE[1]}"

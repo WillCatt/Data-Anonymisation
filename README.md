@@ -18,7 +18,9 @@ Anchored in the [Text Anonymization Benchmark](https://github.com/NorskRegnesent
 
 1. **Off-the-shelf NER is not close.** spaCy's strongest English model scores **0.566 partial-match F1** on TAB, with **0% recall on case-file numbers** — that label doesn't exist in its vocabulary. The failure is categorical, not marginal.
 2. **Fine-tuning closes the detection gap.** RoBERTa fine-tuned on TAB reaches **0.856 F1, 95% CI [0.848, 0.864]** (+29 pp), and the lift lands exactly where TAB's label set diverges from newswire NER. LegalBERT, despite 12 GB of legal pretraining, is statistically indistinguishable from it.
-3. **It doesn't matter.** Assume a *perfect* detector; mask every direct identifier. **All 1,268 documents remain uniquely identifiable** from their residual quasi-identifier fingerprint — age, nationality, occupation, location, dates. Median fingerprint: 25 facts. The joint distribution of 25 ordinary details behaves like a hash.
+3. **It doesn't matter.** Assume a *perfect* detector; mask every direct identifier. **One well-chosen residual fact — a nationality, an occupation, a place — singles out 77% of documents within the corpus; two facts reach 88%.** The identifying information was never only in the names.
+
+   ⚠️ *An earlier version of this README reported "1,268 / 1,268 uniquely identifiable". That figure was an artefact and has been withdrawn — see [the mosaic claim, corrected](#the-mosaic-claim-corrected).*
 
 **The consequence that shaped the product:** anonymisation is not an entity-detection problem. It needs a re-identification check, and it needs a way to keep the text *useful* after redaction.
 
@@ -39,7 +41,7 @@ Four detectors on identical inputs and an identical metric. Presidio plus a cust
 → [`02_baseline_spacy`](notebooks/02_baseline_spacy.ipynb) · [`03_baseline_huggingface`](notebooks/03_baseline_huggingface.ipynb) · [`04_baseline_presidio`](notebooks/04_baseline_presidio.ipynb) · [`05_finetune_roberta`](notebooks/05_finetune_roberta.ipynb) · [`06_detection_head_to_head`](notebooks/06_detection_head_to_head.ipynb)
 
 ### 3 · Re-identification: the finding that changed the product ⭐
-Mask every `DIRECT` span, fingerprint each document by what remains, count how many documents share a fingerprint. None reach k ≥ 5. Perfect detection would not have helped.
+Mask every `DIRECT` span and ask how many of the ordinary details left behind an attacker needs before a document stands alone. Usually one. Perfect detection would not have helped — and the first version of this analysis was wrong in an instructive way ([below](#the-mosaic-claim-corrected)).
 
 → [`notebooks/07_reidentification_mosaic.ipynb`](notebooks/07_reidentification_mosaic.ipynb) · [`figures/mosaic_reidentification.png`](figures/mosaic_reidentification.png)
 
@@ -80,24 +82,26 @@ The table reports the **fine-tune notebooks'** runs (inference `max_length=384`)
 | Ensemble, consensus (min 3) | 0.7949 | 0.7220 | recovers, still loses |
 | Routed (per-label best) | 0.8538 | 0.7902 | collapses to a single model |
 
-**Confidence intervals** *(from the prediction cache, `max_length=512`)*. Bootstrapped over the 555 test documents (10,000 resamples, documents as the resampling unit — spans within a document are correlated, so resampling spans would give intervals that are far too narrow):
+**Confidence intervals** *(from the prediction cache, `max_length=512`)*. Cluster bootstrap, 10,000 resamples, **resampling the 127 unique documents rather than the 555 rows**.
+
+That distinction is not cosmetic. TAB's "555 test documents" are 555 *annotator-annotation pairs over 127 unique judgments* — one document appears up to ten times with different gold spans and identical model predictions. Treating those rows as independent draws makes every interval about **1.7× too narrow**. Spans within a document are correlated for the same reason, one level down.
 
 | Model | Partial F1 | 95% CI |
 |---|---|---|
-| spaCy `en_core_web_trf` | 0.5656 | [0.5544, 0.5764] |
-| Presidio + CASE_NUMBER | 0.6031 | [0.5927, 0.6133] |
-| LegalBERT fine-tuned | 0.8538 | [0.8432, 0.8638] |
-| **RoBERTa fine-tuned** | **0.8559** | **[0.8475, 0.8644]** |
+| spaCy `en_core_web_trf` | 0.5656 | [0.5424, 0.5884] |
+| Presidio + CASE_NUMBER | 0.6031 | [0.5807, 0.6246] |
+| LegalBERT fine-tuned | 0.8538 | [0.8362, 0.8706] |
+| **RoBERTa fine-tuned** | **0.8559** | **[0.8413, 0.8702]** |
 
-**Is RoBERTa actually better than LegalBERT?** No — and this is now tested rather than asserted. Paired bootstrap on identical resampled documents gives **Δ = −0.0022, 95% CI [−0.0080, +0.0029], permutation p = 0.43**. Zero sits comfortably inside the interval. Every other pairing *is* distinguishable (all p ≈ 0.0001), including Presidio over spaCy.
+**Is RoBERTa actually better than LegalBERT?** No — and this is now tested rather than asserted. Paired bootstrap on identical resampled documents gives **Δ = −0.0022, 95% CI [−0.0114, +0.0061], permutation p = 0.64**. Zero sits comfortably inside the interval. Every other pairing *is* distinguishable (all p ≈ 0.0001), including Presidio over spaCy.
 
-Note the paired interval (±0.005) is half the width of either model's own interval (±0.010). That is the point of pairing: both models face the same documents each resample, so "this batch happened to be easy" cancels out. Overlapping individual intervals would not have settled the question either way.
+Note the paired interval (±0.009) is narrower than either model's own (±0.015 to ±0.017). That is the point of pairing: both models face the same documents each resample, so "this batch happened to be easy" cancels out. Overlapping individual intervals would not have settled the question either way.
 
 > **Resolved: the 0.5 pp LegalBERT discrepancy.** The same checkpoint scored 0.8486 in `finetune_legalbert.csv` and 0.8538 in `combiner_comparison.csv` — straddling RoBERTa's reported 0.8510, so *which CSV you quoted decided which model won*. Cause: an inference-config mismatch, not a metric bug. The fine-tune notebooks pass `max_length=384`; the cache-replay path silently took `make_finetuned_predictor`'s `512` default. Smaller windows fragment spans at chunk boundaries and those fragments score as false positives — measured at **+0.0063 F1** for 512 over 384, with identical gold both ways ([`scripts/diagnose_eval_discrepancy.py`](scripts/diagnose_eval_discrepancy.py)). Both fine-tunes were affected equally, so the tie between them held either way — but only by luck. The window is now pinned explicitly in both cache scripts.
 
 Reproduce: `python scripts/bootstrap_ci.py --mode both` → [`results/bootstrap_ci.csv`](results/bootstrap_ci.csv), [`results/paired_comparisons.csv`](results/paired_comparisons.csv).
 
-**Re-identification:** 1,268 / 1,268 TAB documents have k = 1 on the QUASI fingerprint; median signature 25 mentions. Exact surface-form matching — see [Limits](#limits-and-next).
+**Re-identification:** see [the mosaic claim, corrected](#the-mosaic-claim-corrected).
 
 ---
 
@@ -115,6 +119,49 @@ Three measured nulls, kept in the repo on purpose.
 
 ---
 
+## The mosaic claim, corrected
+
+This project's most-quoted number was **"1,268 / 1,268 TAB documents are uniquely identifiable"**. It is withdrawn. It was an artefact of how the fingerprint was matched, and the tell was visible in the output all along: *every* k threshold returned 100%, including k ≤ 10. A measurement with no spread in it is usually measuring its own construction.
+
+### What was wrong
+
+`k_anonymity_table` counted a document as re-identifiable when no other document shared its **entire** quasi-identifier set. The median set holds ~14 facts. Two distinct court judgments matching on all fourteen exactly is close to impossible, so k = 1 was very nearly guaranteed before any data was read.
+
+The composition made it worse. **63% of the fingerprint is DATETIME, and 85% of those normalise to a bare year** — "1999", "2003". Procedural years identify a *case*, not a person, and they are shared widely: "1999" appears in 55 documents.
+
+### The control that settles it
+
+Replace every real fact with a meaningless token from a fixed pool, keeping each document's set **size** identical:
+
+```
+real facts                    k=1 for 1,268/1,268 (100.0%)
+random facts, same set sizes  k=1 for 1,268/1,268 (100.0%)   ← control
+```
+
+Meaningless data scores identically. The metric was measuring set size, not identifiability.
+
+### What survives, and it is still a real finding
+
+The right question is not "is the whole fingerprint unique" but **"how many facts must an attacker learn, rarest first, before the target stands alone?"** That has an actual distribution:
+
+| Attribute set | n | median facts | 1 fact | 2 facts | 3 facts | never unique |
+|---|---|---|---|---|---|---|
+| All (DEM + DATETIME + LOC + QUANTITY) | 1,268 | 14 | 81.2% | 93.3% | 96.5% | 0.9% |
+| **Person-like only (DEM + LOC)** | **887** | **4** | **76.8%** | **87.5%** | **88.3%** | **11.3%** |
+| Demographics only (DEM) | 378 | 3 | 80.2% | 88.4% | 89.2% | 10.6% |
+
+Two things make this trustworthy where the old number wasn't. It has a **distribution** — 11% of documents are never unique, even given every fact. And it **survives deleting the dates and the money entirely**: restricting to nationality, ethnicity, occupation and location barely moves it, from 81% to 77% on one fact. The finding was never actually driven by the years; the old metric just made it impossible to tell.
+
+The design consequence is unchanged, which is why the product was built the way it is: **one ordinary residual detail is usually enough, so anonymisation needs a re-identification check and not just entity masking.**
+
+### The caveat that now leads
+
+Uniqueness here is uniqueness **within a 1,268-document corpus**, not within a population. A "Bulgarian nurse" may be alone among these judgments and one of many thousands in the world. This measures how distinguishable the documents are from each other; it is an upper bound on real-world re-identification risk, not a re-identification rate. Any honest use of this result has to say so.
+
+Reproduce: `python scripts/diagnose_mosaic_claim.py` → [`results/mosaic_diagnosis.csv`](results/mosaic_diagnosis.csv)
+
+---
+
 ## Ablations: which knobs actually moved the number
 
 Reconciling the LegalBERT discrepancy raised an uncomfortable question. If a tokenisation setting was worth 0.5 pp, and the gap between the two backbones was 0.2 pp and not statistically distinguishable, then **what was actually driving the score?** So I swept it properly.
@@ -125,15 +172,15 @@ Long documents are processed as overlapping sliding windows. `max_length` sets t
 
 | max_length | stride | Partial F1 | 95% CI | Δ vs trained config | real? | predictions |
 |---|---|---|---|---|---|---|
-| 512 | 0 | **0.8624** | [0.8536, 0.8710] | +0.0113 | yes | 20,913 |
-| 384 | 0 | 0.8616 | [0.8534, 0.8698] | +0.0106 | yes | 20,912 |
-| 256 | 0 | 0.8560 | [0.8480, 0.8640] | +0.0049 | yes | 20,698 |
-| 512 | 64 | 0.8559 | [0.8475, 0.8644] | +0.0049 | yes | 21,336 |
-| 512 | 128 | 0.8519 | [0.8433, 0.8605] | +0.0009 | no | 21,561 |
-| 384 | 64 | 0.8510 | [0.8426, 0.8593] | — *(as trained)* | — | 21,460 |
-| 256 | 64 | 0.8413 | [0.8330, 0.8496] | −0.0097 | yes | 22,071 |
-| 384 | 128 | 0.8393 | [0.8307, 0.8480] | −0.0117 | yes | 22,121 |
-| 256 | 128 | 0.8219 | [0.8134, 0.8305] | −0.0291 | yes | 23,161 |
+| 512 | 0 | **0.8624** | [0.8472, 0.8771] | +0.0113 | yes | 20,913 |
+| 384 | 0 | 0.8616 | [0.8475, 0.8752] | +0.0106 | yes | 20,912 |
+| 256 | 0 | 0.8560 | [0.8422, 0.8690] | +0.0049 | no | 20,698 |
+| 512 | 64 | 0.8559 | [0.8413, 0.8702] | +0.0049 | no | 21,336 |
+| 512 | 128 | 0.8519 | [0.8368, 0.8670] | +0.0009 | no | 21,561 |
+| 384 | 64 | 0.8510 | [0.8367, 0.8649] | — *(as trained)* | — | 21,460 |
+| 256 | 64 | 0.8413 | [0.8267, 0.8556] | −0.0097 | yes | 22,071 |
+| 384 | 128 | 0.8393 | [0.8236, 0.8550] | −0.0117 | yes | 22,121 |
+| 256 | 128 | 0.8219 | [0.8064, 0.8378] | −0.0291 | yes | 23,161 |
 
 **Spread across configs: 0.0405 F1 — eighteen times the 0.0022 gap between the two fine-tuned backbones.** The sweep also reproduces the notebook's headline 0.8510 exactly at the config it was trained with, which is what makes the rest of the table trustworthy rather than harness drift.
 
@@ -152,8 +199,8 @@ The same entity seen in two adjacent windows comes back with slightly different 
 |---|---|---|---|---|---|
 | spaCy | 0.5656 | 0.5656 | +0.0000 | — | no |
 | Presidio | 0.6031 | 0.6032 | +0.0001 | [−0.0000, +0.0002] | no |
-| LegalBERT | 0.8538 | 0.8588 | +0.0051 | [+0.0044, +0.0058] | yes |
-| RoBERTa | 0.8559 | **0.8636** | +0.0077 | [+0.0068, +0.0086] | yes |
+| LegalBERT | 0.8538 | 0.8588 | +0.0051 | [+0.0037, +0.0066] | yes |
+| RoBERTa | 0.8559 | **0.8636** | +0.0077 | [+0.0058, +0.0098] | yes |
 
 382 of the 387 spans removed for RoBERTa were false positives. spaCy and Presidio are untouched because neither uses sliding windows — exactly the signature the explanation predicts.
 
@@ -260,7 +307,7 @@ anonymise redact --variant pro --pseudonymise --vault-out vault.json doc.txt
 
 **Limits — stated plainly.**
 - **TAB is English-only and ECHR-only.** Findings are sharp on this corpus; cross-corpus validation is needed before claiming generality.
-- **Mosaic fingerprints match on exact surface form.** A real attacker matches fuzzily. The 100% number is conservative in one direction (real risk is at least this bad) and optimistic in another (a real haystack is bigger and noisier than TAB).
+- **Re-identification is measured within the corpus, not a population.** Uniqueness among 1,268 judgments is not uniqueness among people. The curve above bounds how distinguishable these documents are; it is not a re-identification rate. Fingerprints also match on exact surface form after normalisation, where a real attacker would match fuzzily.
 - **No human ceiling established.** TAB has non-trivial annotator disagreement on identifier role. Without a human-vs-human F1, we don't know how close 0.851 is to the realistic maximum — which also means we don't know when to stop optimising.
 - **Text in, text out.** No PDF/DOCX extraction, no layout handling, no cross-document linking, no service packaging.
 

@@ -82,10 +82,22 @@ def main() -> None:
 
     cache = json.loads(CACHE.read_text())
     models = [m for m in ("spacy", "presidio", "legalbert", "roberta") if m in cache[0]]
-    rng = np.random.default_rng(args.seed)
-    idx = rng.integers(0, len(cache), size=(args.iters, len(cache)))
 
-    print(f"Cache: {len(cache)} docs · models: {', '.join(models)} · match: {args.mode}\n")
+    # Cluster by doc_id — the cache holds several annotators per document.
+    order, groups = [], {}
+    for i, e in enumerate(cache):
+        if e["doc_id"] not in groups:
+            groups[e["doc_id"]] = []
+            order.append(e["doc_id"])
+        groups[e["doc_id"]].append(i)
+    clusters = [groups[d] for d in order]
+    n_clusters = len(clusters)
+
+    rng = np.random.default_rng(args.seed)
+    idx = rng.integers(0, n_clusters, size=(args.iters, n_clusters))
+
+    print(f"Cache: {len(cache)} rows over {n_clusters} unique documents"
+          f" · models: {', '.join(models)} · match: {args.mode}\n")
     print(f"{'model':11} {'as evaluated':>13} {'overlap-deduped':>16} {'Δ':>9} {'95% CI':>19} {'real?':>7}")
     print("─" * 82)
 
@@ -101,8 +113,9 @@ def main() -> None:
 
         arrs = {k: np.array(v) for k, v in counts.items()}
         f1 = {k: float(micro_f1(a[:, 0].sum(), a[:, 1].sum(), a[:, 2].sum())) for k, a in arrs.items()}
-        dists = {k: micro_f1(a[:, 0][idx].sum(1), a[:, 1][idx].sum(1), a[:, 2][idx].sum(1))
-                 for k, a in arrs.items()}
+        cl = {k: np.array([a[rows].sum(axis=0) for rows in clusters]) for k, a in arrs.items()}
+        dists = {k: micro_f1(c[:, 0][idx].sum(1), c[:, 1][idx].sum(1), c[:, 2][idx].sum(1))
+                 for k, c in cl.items()}
         diff = dists["deduped"] - dists["raw"]
         lo, hi = np.percentile(diff, [2.5, 97.5])
         real = not (lo <= 0.0 <= hi)

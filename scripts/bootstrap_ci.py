@@ -9,14 +9,24 @@ made without ever testing them. This script measures the noise.
 
 Method
 ------
-*Bootstrap over documents.* Resample the 555 test documents WITH REPLACEMENT
-`--iters` times, recompute micro-F1 on each resample, and take the 2.5th and
-97.5th percentiles as a 95% interval.
+*Cluster bootstrap over documents.* Resample WITH REPLACEMENT `--iters` times,
+recompute micro-F1 on each resample, and take the 2.5th and 97.5th percentiles
+as a 95% interval.
 
-Documents — not spans — are the resampling unit, and that choice matters. Spans
-inside a document are strongly correlated: a judgment full of unusual foreign
-names is hard for *all* of its spans at once. Resampling spans would treat
-those as independent draws and produce intervals that are far too narrow.
+The resampling unit is the **unique document**, and getting this right matters
+twice over.
+
+First, spans inside a document are strongly correlated — a judgment full of
+unusual foreign names is hard for *all* of its spans at once — so resampling
+spans would produce intervals that are far too narrow.
+
+Second, and less obviously: TAB's "555 test documents" are 555
+*annotator-annotation pairs over only 127 unique documents*. One document
+appears up to ten times, each with a different annotator's gold spans and
+identical model predictions. Resampling those 555 rows treats ten views of one
+judgment as ten independent draws. Clustering by `doc_id` — sampling documents
+and taking all of their annotator rows together — widens the intervals by about
+1.7x, and that width is the honest one.
 
 *Paired comparison.* Two models are compared on the SAME resampled documents,
 recording the difference each time. Because both models face identical
@@ -76,18 +86,31 @@ def micro_f1(tp: np.ndarray, fp: np.ndarray, fn: np.ndarray) -> np.ndarray:
 
 
 def per_document_counts(cache: List[dict], model: str, mode: str, label: str = "_ALL"):
-    """(tp, fp, fn) arrays of length n_docs — the only pass over the span data."""
-    tp = np.empty(len(cache), dtype=np.int64)
-    fp = np.empty(len(cache), dtype=np.int64)
-    fn = np.empty(len(cache), dtype=np.int64)
-    for i, entry in enumerate(cache):
+    """
+    (tp, fp, fn) arrays with ONE ENTRY PER UNIQUE DOCUMENT.
+
+    Rows sharing a doc_id are different annotators' gold for the same text, so
+    their counts are summed into a single cluster. Summing first is exactly
+    equivalent to concatenating each resample's rows, and it lets the bootstrap
+    stay vectorised.
+    """
+    acc: Dict[str, List[int]] = {}
+    order: List[str] = []
+    for entry in cache:
+        doc_id = entry["doc_id"]
+        if doc_id not in acc:
+            acc[doc_id] = [0, 0, 0]
+            order.append(doc_id)
         r = score_spans(as_spans(entry[model]), as_spans(entry["gold"]), mode)[label]
-        tp[i], fp[i], fn[i] = r.tp, r.fp, r.fn
-    return tp, fp, fn
+        acc[doc_id][0] += r.tp
+        acc[doc_id][1] += r.fp
+        acc[doc_id][2] += r.fn
+    a = np.array([acc[d] for d in order], dtype=np.int64)
+    return a[:, 0], a[:, 1], a[:, 2]
 
 
 def bootstrap_f1(counts, idx: np.ndarray) -> np.ndarray:
-    """Micro-F1 for every resample. `idx` is (n_iters, n_docs) of document indices."""
+    """Micro-F1 for every resample. `idx` is (n_iters, n_clusters) of doc indices."""
     tp, fp, fn = counts
     return micro_f1(tp[idx].sum(axis=1), fp[idx].sum(axis=1), fn[idx].sum(axis=1))
 
@@ -131,21 +154,23 @@ def main() -> None:
         sys.exit(f"No prediction cache at {CACHE}. Run scripts/cache_predictions.py first.")
 
     cache = json.loads(CACHE.read_text())
+    n_unique = len({e["doc_id"] for e in cache})
     models = [m for m in KNOWN_MODELS if m in cache[0]]
     missing = [m for m in KNOWN_MODELS if m not in cache[0]]
     modes = ["partial", "exact"] if args.mode == "both" else [args.mode]
 
-    print(f"Cache: {len(cache)} documents · models present: {', '.join(models)}")
+    print(f"Cache: {len(cache)} annotator rows over {n_unique} unique documents"
+          f" · models present: {', '.join(models)}")
     if missing:
         print(f"        not cached yet: {', '.join(missing)}"
               f"  (run scripts/cache_roberta_predictions.py)")
-    print(f"Resampling documents with replacement — {args.iters:,} iterations, seed {args.seed}\n")
+    print(f"Cluster bootstrap over {n_unique} unique documents — "
+          f"{args.iters:,} iterations, seed {args.seed}\n")
 
     rng = np.random.default_rng(args.seed)
-    n_docs = len(cache)
     # ONE index matrix, shared by every model and every pair. This is what makes
     # the comparisons paired: each resample is the same set of documents for all.
-    idx = rng.integers(0, n_docs, size=(args.iters, n_docs))
+    idx = rng.integers(0, n_unique, size=(args.iters, n_unique))
 
     ci_rows: List[dict] = []
     pair_rows: List[dict] = []
