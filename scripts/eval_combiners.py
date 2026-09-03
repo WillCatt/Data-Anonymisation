@@ -15,7 +15,7 @@ cache itself, so it is not hand-tuned. Saves combiner_comparison.csv.
 
 Run from the repo root:
     PYTHONPATH=src legal-anon-env/bin/python \
-        phase6_advanced_training/scripts/eval_combiners.py
+        scripts/eval_combiners.py
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
 import pandas as pd
@@ -35,9 +35,9 @@ from anonymisation.evaluation import (
 )
 from anonymisation.mapping import TAB_TO_SPACY
 
-CACHE = REPO / "phase6_advanced_training/results/predictions_cache.json"
-OUT = REPO / "phase6_advanced_training/results/combiner_comparison.csv"
-OUT_PERLABEL = REPO / "phase6_advanced_training/results/per_model_per_label_f1.csv"
+CACHE = REPO / "results/predictions_cache.json"
+OUT = REPO / "results/combiner_comparison.csv"
+OUT_PERLABEL = REPO / "results/per_model_per_label_f1.csv"
 MODELS = ["spacy", "legalbert", "presidio"]
 LABELS = list(TAB_TO_SPACY.keys())
 Span = Tuple[int, int, str, str]

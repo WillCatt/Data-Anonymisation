@@ -5,7 +5,7 @@ This is the *strongest available* version of the pipeline, in a single UI:
 
 - NER backend is auto-detected at startup with a three-tier fallback:
     1. Phase 2 RoBERTa fine-tuned on TAB
-       (phase2_baseline_comparison/checkpoints/roberta-tab/final/)
+       (models/roberta-tab/final/)
     2. spaCy en_core_web_trf (transformer)
     3. spaCy en_core_web_sm (small) — last resort
 
@@ -42,7 +42,7 @@ from anonymisation.pipeline import LitePipeline, ProPipeline, MosaicScorer     #
 # ---------------------------------------------------------------------------
 # Three-tier NER backend with auto-detection
 # ---------------------------------------------------------------------------
-_FINETUNED_DIR = ROOT / "phase2_baseline_comparison" / "checkpoints" / "roberta-tab" / "final"
+_FINETUNED_DIR = ROOT / "models" / "roberta-tab" / "final"
 
 _state = {
     "predictor": None,
@@ -100,7 +100,7 @@ def _get_predictor() -> Tuple[Callable, str]:
         elif forced == "finetuned":
             raise SystemExit(
                 f"PIPELINE_BACKEND=finetuned but no model at {_FINETUNED_DIR}. "
-                f"Run phase2_baseline_comparison/03_finetune_roberta.ipynb first."
+                f"Run notebooks/05_finetune_roberta.ipynb first."
             )
 
     # 2. Try spaCy transformer (medium quality, common install).

@@ -1,7 +1,7 @@
 """
 Build the fine-tune results figure for the portfolio RESULTS tab.
 
-Reads phase2_baseline_comparison/results/finetuned_results.csv (the Phase-2
+Reads results/finetune_roberta.csv (the Phase-2
 RoBERTa fine-tune, the project's production model) and plots per-entity F1 for
 both partial- and exact-match, with the overall scores called out.
 
@@ -18,7 +18,7 @@ import pandas as pd
 import seaborn as sns
 
 ROOT = Path(__file__).resolve().parent.parent
-CSV = ROOT / "phase2_baseline_comparison" / "results" / "finetuned_results.csv"
+CSV = ROOT / "results" / "finetune_roberta.csv"
 OUT = ROOT / "figures" / "finetune_results_by_entity.png"
 
 sns.set_theme(style="whitegrid", font_scale=0.95)

@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "figures"))            # import the mosaic helpers
+sys.path.insert(0, str(ROOT / "scripts"))            # import the mosaic helpers
 from build_mosaic import (  # noqa: E402
     cdf,
     load_tab,
@@ -58,9 +58,9 @@ def _strip(ax):
 
 def read_overall_f1() -> tuple[int, int]:
     """Overall partial-match F1 for the off-the-shelf baseline and the fine-tune."""
-    base = pd.read_csv(ROOT / "results" / "phase1_results.csv")
+    base = pd.read_csv(ROOT / "results" / "baseline_spacy.csv")
     base_f1 = base[(base["mode"] == "partial") & (base["entity_type"] == "_ALL")]["f1"].iloc[0]
-    ft = pd.read_csv(ROOT / "phase2_baseline_comparison" / "results" / "finetuned_results.csv")
+    ft = pd.read_csv(ROOT / "results" / "finetune_roberta.csv")
     ft_f1 = ft[(ft["mode"] == "partial") & (ft["entity_type"] == "_ALL")]["f1"].iloc[0]
     return round(base_f1 * 100), round(ft_f1 * 100)
 

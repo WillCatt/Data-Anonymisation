@@ -32,7 +32,7 @@ phase2_baseline_comparison/
 
 > Notebooks 01, 02, 03 are independent — run them in any order. Notebook 04 reads the CSVs the first three produce.
 
-1. Make sure your venv has Phase 2 deps installed (`pip install -r ../requirements.txt` from the repo root).
+1. Make sure your venv has the research extras installed (`pip install -e ".[research]"` from the repo root).
 2. Download Presidio's recommended spaCy model (only needed for notebook 02):
    ```
    python -m spacy download en_core_web_lg

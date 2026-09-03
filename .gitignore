@@ -62,3 +62,6 @@ phase6_advanced_training/results/predictions_cache.json
 
 # --- OS ---
 Thumbs.db
+
+# --- Interview prep (local only) ---
+INTERVIEW_PLAN.md

@@ -19,7 +19,7 @@ Usage
 
 The defaults pick spaCy as the NER provider so the CLI runs out of the box
 on a Phase-1 install. Pass `--ner finetuned` once you have a Phase-2 trained
-model in `phase2_baseline_comparison/checkpoints/roberta-tab/final/`.
+model in `models/roberta-tab/final/`.
 """
 from __future__ import annotations
 
@@ -81,7 +81,7 @@ def build_ner_provider(choice: str, model_path: str | None):
         if not model_path:
             raise SystemExit(
                 "--ner finetuned requires --ner-model PATH "
-                "(e.g. phase2_baseline_comparison/checkpoints/roberta-tab/final)"
+                "(e.g. models/roberta-tab/final)"
             )
         return _finetuned_predictor(model_path)
     raise SystemExit(f"unknown --ner choice: {choice}")

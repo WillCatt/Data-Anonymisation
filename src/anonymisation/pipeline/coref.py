@@ -31,7 +31,7 @@ at the recall ceiling on the PERSON/ORG mentions the substring rule could
 recover, and the labels with real recall gaps (DEM, MISC, CODE) are ones it
 can't help with. It is kept as a zero-cost defensive layer — every span it
 adds is logged with source="coref" and confidence=0.7 — not as a source of
-headline gains. See phase5_coreference/evaluate_mention_recall.py for the
+headline gains. See scripts/evaluate_mention_recall.py for the
 evaluation that produced the null.
 """
 from __future__ import annotations

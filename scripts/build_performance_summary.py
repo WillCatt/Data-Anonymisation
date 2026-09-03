@@ -76,12 +76,12 @@ def _safe_read(path: Path, default_model: Optional[str] = None) -> Optional[pd.D
 
 def load_all() -> pd.DataFrame:
     sources = [
-        (ROOT / "results" / "phase1_results.csv",                        "spacy_trf"),
-        (ROOT / "phase2_baseline_comparison" / "results" / "hf_results.csv",         None),
-        (ROOT / "phase2_baseline_comparison" / "results" / "presidio_results.csv",   None),
-        (ROOT / "phase2_baseline_comparison" / "results" / "finetuned_results.csv",  None),
-        (ROOT / "phase6_advanced_training" / "results" / "legalbert_results.csv",    None),
-        (ROOT / "phase6_advanced_training" / "results" / "ensemble_results.csv",     None),
+        (ROOT / "results" / "baseline_spacy.csv",                        "spacy_trf"),
+        (ROOT / "results" / "baseline_huggingface.csv",         None),
+        (ROOT / "results" / "baseline_presidio.csv",   None),
+        (ROOT / "results" / "finetune_roberta.csv",  None),
+        (ROOT / "results" / "finetune_legalbert.csv",    None),
+        (ROOT / "results" / "null_ensemble.csv",     None),
     ]
     frames: List[pd.DataFrame] = []
     print("Loading results:")
@@ -216,11 +216,11 @@ def panel_phase5_mention_recall(ax: plt.Axes) -> bool:
     """
     Render the Phase 5 mention-recall comparison.
 
-    Reads phase5_coreference/results/mention_recall_summary.json. Returns
+    Reads results/null_coreference_summary.json. Returns
     True if the panel rendered (file existed); False otherwise so the
     caller can fall back to the progression callout.
     """
-    summary_path = ROOT / "phase5_coreference" / "results" / "mention_recall_summary.json"
+    summary_path = ROOT / "results" / "null_coreference_summary.json"
     if not summary_path.exists():
         return False
 

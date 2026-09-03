@@ -19,9 +19,9 @@ Phase-5 CorefExtender enabled.
 
 Run with:
 
-    python phase5_coreference/evaluate_mention_recall.py \\
+    python scripts/evaluate_mention_recall.py \\
         --sample 100 \\
-        --out phase5_coreference/results/mention_recall.csv
+        --out results/null_coreference_mention_recall.csv
 
 Without --sample, it runs on the full TAB test split (555 documents,
 about 8 minutes on `en_core_web_trf`).
@@ -161,9 +161,9 @@ def main() -> None:
                         help="If > 0, evaluate on the first N test docs only (debug runs).")
     parser.add_argument("--spacy-model", default="en_core_web_trf",
                         help="spaCy model for the NER backbone.")
-    parser.add_argument("--out", default="phase5_coreference/results/mention_recall.csv",
+    parser.add_argument("--out", default="results/null_coreference_mention_recall.csv",
                         help="Path for the per-entity CSV.")
-    parser.add_argument("--summary", default="phase5_coreference/results/mention_recall_summary.json",
+    parser.add_argument("--summary", default="results/null_coreference_summary.json",
                         help="Path for the aggregate summary JSON.")
     args = parser.parse_args()
 

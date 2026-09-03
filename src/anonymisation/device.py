@@ -27,7 +27,7 @@ def best_device() -> Tuple[str, str]:
         import torch
     except ImportError as exc:  # pragma: no cover
         raise ImportError(
-            "Phase 2 requires PyTorch. Install via `pip install -r requirements.txt`."
+            "This backend requires PyTorch. Install via `pip install -e \".[research]\"`."
         ) from exc
 
     if torch.cuda.is_available():

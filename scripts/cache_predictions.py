@@ -8,7 +8,7 @@ then replays the cache to score any number of combiner strategies instantly.
 
 Run from the repo root:
     PYTHONPATH=src legal-anon-env/bin/python \
-        phase6_advanced_training/scripts/cache_predictions.py
+        scripts/cache_predictions.py
 """
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ import sys
 import time
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
 import warnings
@@ -29,8 +29,8 @@ from anonymisation.evaluation import extract_gold_entities
 from anonymisation.predictors import make_finetuned_predictor, build_presidio_analyzer, make_presidio_predictor
 from anonymisation.device import best_device
 
-LEGALBERT_DIR = REPO / "phase6_advanced_training/notebooks/checkpoints/legalbert-tab/final"
-OUT_PATH = REPO / "phase6_advanced_training/results/predictions_cache.json"
+LEGALBERT_DIR = REPO / "models/legalbert-tab/final"
+OUT_PATH = REPO / "results/predictions_cache.json"
 
 
 def build_predictors():

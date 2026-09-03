@@ -1,31 +1,100 @@
 # Legal Text Anonymisation
 
-> Can a law firm safely use AI on its own client matter data? An empirical answer in six phases — measurement, modelling, deployable pipeline, and honest negative results.
+> **Can a law firm safely put its own client matter data through an LLM?**
+> An empirical answer: measure the detector, then measure what's *still* identifying after the detector is perfect.
 
-[![Phase 1](https://img.shields.io/badge/Phase_1-Proof_of_Concept-2ecc71?style=flat-square)](notebooks/)
-[![Phase 2](https://img.shields.io/badge/Phase_2-RoBERTa_FT_85.1%25_F1-2ecc71?style=flat-square)](phase2_baseline_comparison/)
-[![Phase 3](https://img.shields.io/badge/Phase_3-Redact_+_Anonymise_Pipelines-2ecc71?style=flat-square)](phase3_pipeline/)
-[![Phase 4](https://img.shields.io/badge/Phase_4-Pseudonymisation_+_Round--Trip-2ecc71?style=flat-square)](phase4_pseudonymisation/)
-[![Phase 5](https://img.shields.io/badge/Phase_5-Coref_(measured_null)-95a5a6?style=flat-square)](phase5_coreference/)
-[![Phase 6](https://img.shields.io/badge/Phase_6-LegalBERT_84.9%25_·_Ensemble_55.3%25↓-95a5a6?style=flat-square)](phase6_advanced_training/)
-[![Demo](https://img.shields.io/badge/Demo-Static_+_Gradio_+_Spaces-3498db?style=flat-square)](demo/)
-[![Best F1](https://img.shields.io/badge/Best_F1-85.1%25_(RoBERTa)-27ae60?style=flat-square)](figures/phase_overall_f1.png)
-[![Mosaic](https://img.shields.io/badge/Mosaic-unique_by_3_quasi--facts-d73a49?style=flat-square)](figures/mosaic_reidentification.png)
 [![tests](https://github.com/WillCatt/Data-Anonymisation/actions/workflows/tests.yml/badge.svg)](https://github.com/WillCatt/Data-Anonymisation/actions/workflows/tests.yml)
+[![Best F1](https://img.shields.io/badge/detection-0.851_F1_(RoBERTa_FT)-27ae60?style=flat-square)](figures/phase_overall_f1.png)
+[![Mosaic](https://img.shields.io/badge/re--identification-1,268_/_1,268_unique-d73a49?style=flat-square)](figures/mosaic_reidentification.png)
+[![Demo](https://img.shields.io/badge/demo-Gradio_+_HF_Spaces-3498db?style=flat-square)](https://willxo-legal-text-anonymisation.hf.space)
 
-A portfolio project on PII redaction for legal text, anchored in the [Text Anonymization Benchmark](https://github.com/NorskRegnesentral/text-anonymization-benchmark) (TAB). Tests whether off-the-shelf NER is enough to anonymise court documents, and quantifies the residual mosaic / re-identification risk that NER alone cannot fix.
+Anchored in the [Text Anonymization Benchmark](https://github.com/NorskRegnesentral/text-anonymization-benchmark) (TAB) — 1,268 European Court of Human Rights judgments annotated with entity type **and** identifier role (`DIRECT` / `QUASI` / `NO_MASK`). That second axis is what makes the re-identification question answerable at all, and it is why this corpus and not a general NER one.
 
-**[→ Read the full writeup](writeup/README.md)**
+**[→ Read the full writeup](docs/writeup.md)**
 
 ---
 
-## TL;DR
+## Three findings
 
-- spaCy's strongest off-the-shelf English NER scores **~0.57 partial-match F1 on TAB** — meaning it misses or misidentifies ≈ half of all sensitive entities.
-- It has **0% recall** on case file numbers (TAB's `CODE` type), because that label doesn't exist in the model's training vocabulary.
-- Even with a hypothetical *perfect* NER on direct identifiers, **every TAB document (1,268 / 1,268)** remains uniquely identifiable from its **quasi-identifier fingerprint** alone — the mosaic effect, in its starkest form.
-- Implication: anonymisation is not an NER problem. The pipeline needs a re-identification check too.
-- **Phase 4** — `pseudonymise=True` makes the redacted document still *useful*: each distinct entity gets a stable referential token (`[PERSON_A]`, `[PERSON_B]`), and the firm can `restore()` an LLM's answer locally without ever exposing real names.
+1. **Off-the-shelf NER is not close.** spaCy's strongest English model scores **0.566 partial-match F1** on TAB, with **0% recall on case-file numbers** — that label doesn't exist in its vocabulary. The failure is categorical, not marginal.
+2. **Fine-tuning closes the detection gap.** RoBERTa fine-tuned on TAB reaches **0.851 F1** (+28.5 pp), and the lift lands exactly where TAB's label set diverges from newswire NER.
+3. **It doesn't matter.** Assume a *perfect* detector; mask every direct identifier. **All 1,268 documents remain uniquely identifiable** from their residual quasi-identifier fingerprint — age, nationality, occupation, location, dates. Median fingerprint: 25 facts. The joint distribution of 25 ordinary details behaves like a hash.
+
+**The consequence that shaped the product:** anonymisation is not an entity-detection problem. It needs a re-identification check, and it needs a way to keep the text *useful* after redaction.
+
+---
+
+## How the project moved
+
+The repo is organised by function, not chronology. The narrative runs like this — each stage links to the evidence.
+
+### 1 · The problem
+A legal team wants summaries and chronologies from an LLM over files that carry privileged names, case numbers and identifying context. The reflex answer is *"just strip the names out first."* This project treats that as a hypothesis to test rather than a solution to implement.
+
+→ [`notebooks/01_problem_and_data.ipynb`](notebooks/01_problem_and_data.ipynb)
+
+### 2 · Detection: how good is off-the-shelf, and what does training buy?
+Four detectors on identical inputs and an identical metric. Presidio plus a custom case-number recogniser fixes `CODE` recall (0% → 92%) but barely moves the headline, because its ORG precision of 0.13 floods the output with false positives. Fine-tuning wins.
+
+→ [`02_baseline_spacy`](notebooks/02_baseline_spacy.ipynb) · [`03_baseline_huggingface`](notebooks/03_baseline_huggingface.ipynb) · [`04_baseline_presidio`](notebooks/04_baseline_presidio.ipynb) · [`05_finetune_roberta`](notebooks/05_finetune_roberta.ipynb) · [`06_detection_head_to_head`](notebooks/06_detection_head_to_head.ipynb)
+
+### 3 · Re-identification: the finding that changed the product ⭐
+Mask every `DIRECT` span, fingerprint each document by what remains, count how many documents share a fingerprint. None reach k ≥ 5. Perfect detection would not have helped.
+
+→ [`notebooks/07_reidentification_mosaic.ipynb`](notebooks/07_reidentification_mosaic.ipynb) · [`figures/mosaic_reidentification.png`](figures/mosaic_reidentification.png)
+
+### 4 · The pipeline: three modes, chosen by threat model
+- **Redact** (`LitePipeline`) — strip `DIRECT` identifiers. Fast, predictable, no mosaic handling.
+- **Anonymise** (`ProPipeline`) — then iterate: generalise `QUASI` spans one level at a time (47 → ~50 → 40s → suppressed; Plovdiv → Bulgaria → Europe) until k ≥ target or the budget runs out.
+- **Pseudonymise** — stable referential tokens (`[PERSON_A]`) with the token→name **vault held locally**, so an LLM can still follow who did what to whom and the answer is restored on-prem.
+
+Flat redaction is *more private and less useful*. The vault is what makes the text worth sending at all — and it generalises well beyond law.
+
+→ [`08_pipeline_lite`](notebooks/08_pipeline_lite.ipynb) · [`09_pipeline_pro`](notebooks/09_pipeline_pro.ipynb) · [`10_pipeline_lite_vs_pro`](notebooks/10_pipeline_lite_vs_pro.ipynb) · [`11_pseudonymisation`](notebooks/11_pseudonymisation.ipynb) · [`figures/round_trip_threat_model.png`](figures/round_trip_threat_model.png)
+
+### 5 · Evaluation, and three things that didn't work
+See [What didn't work](#what-didnt-work). All three are kept deliberately — the honest null is the finding.
+
+→ [`12_null_coreference`](notebooks/12_null_coreference.ipynb) · [`13_finetune_legalbert`](notebooks/13_finetune_legalbert.ipynb) · [`14_null_ensemble`](notebooks/14_null_ensemble.ipynb) · [`15_final_head_to_head`](notebooks/15_final_head_to_head.ipynb)
+
+### 6 · Where it goes next
+The two controls this project arrived at — a minimum group size before anything is reportable, and generalising indirect details until a combination stops being unique — are k-anonymity and the mosaic effect. Employee-survey platforms already ship them as product settings. Free-text comments are where they're hardest to enforce, and exactly the text people now want to run through an LLM. See [Limits and next](#limits-and-next).
+
+---
+
+## Results
+
+Partial-match span F1 on the 555-document TAB test split. Every model runs behind the same predictor contract and is scored by the same code, so the numbers are directly comparable.
+
+| Model | Partial F1 | Exact F1 | Note |
+|---|---|---|---|
+| spaCy `en_core_web_trf` | 0.5656 | 0.3807 | baseline · CODE recall **0.0** |
+| `dslim/bert-base-NER` | 0.1669 | 0.0546 | CoNLL label set discards most of TAB — not a meaningful comparison |
+| Presidio (stock) | 0.6024 | 0.4252 | ORG precision 0.13 |
+| Presidio + CASE_NUMBER | 0.6031 | 0.4249 | regex fixes CODE; ORG noise dominates |
+| **RoBERTa fine-tuned** | **0.8510** | **0.7842** | **best** |
+| LegalBERT fine-tuned | 0.8486 | 0.7847 | tie — see null #2 |
+| Ensemble, union (min 1) | 0.5530 | 0.4793 | backfired — see null #3 |
+| Ensemble, consensus (min 3) | 0.7949 | 0.7220 | recovers, still loses |
+| Routed (per-label best) | 0.8538 | 0.7902 | collapses to a single model |
+
+> **Known discrepancy.** LegalBERT reports 0.8486 via `results/finetune_legalbert.csv` and 0.8538 via `results/combiner_comparison.csv` — two evaluation paths, 0.5 pp apart, straddling RoBERTa's 0.8510. Reconciling this (and putting confidence intervals on every number above) is the top open item.
+
+**Re-identification:** 1,268 / 1,268 TAB documents have k = 1 on the QUASI fingerprint; median signature 25 mentions. Exact surface-form matching — see [Limits](#limits-and-next).
+
+---
+
+## What didn't work
+
+Three measured nulls, kept in the repo on purpose.
+
+**1 · Coreference extension moved recall by 0.0001.** The hypothesis was that NER under-recalls shorthand mentions ("Maria" after "Maria Petrova"). Macro recall went 0.8399 → 0.8400. spaCy is already at ≥95% recall on PERSON and ORG, so there was nothing for the rule to find; the categories that *do* under-recall (DEM, MISC, CODE) are exactly the ones a substring rule can't help. Kept as a zero-cost defensive layer, kept out of the headline.
+
+**2 · LegalBERT's domain pretraining bought nothing.** 12 GB of legal text, same fine-tune recipe: 0.849 vs 0.851. Domain pretraining helps when the task *vocabulary* differs from the pretraining corpus. TAB's labels are general-NER labels — knowing "estoppel" doesn't help you recognise a name.
+
+**3 · The three-way ensemble scored worse than its own baseline.** Union voting over spaCy + LegalBERT + Presidio gave 0.553, against 0.851 for either fine-tune alone. The mechanism is clean: Presidio's ORG precision is 0.14, and under `min_votes=1` every one of its false positives lands in the output even when both fine-tunes correctly rejected it. **The ensemble inherited its worst member.** Fixing the vote rule confirms the diagnosis — consensus recovers to 0.795 — but no combiner beats the single fine-tune, because it is Pareto-dominant across all eight labels, so per-label routing collapses to it alone.
+
+→ [`figures/ensemble_backfire.png`](figures/ensemble_backfire.png) · [`docs/notes/advanced-training.md`](docs/notes/advanced-training.md)
 
 ---
 
@@ -33,161 +102,100 @@ A portfolio project on PII redaction for legal text, anchored in the [Text Anony
 
 ```
 .
-├── notebooks/                         Phase 1 — proof of concept
-│   ├── 01_problem_setup.ipynb         framing, EDA, mosaic preview
-│   ├── 02_baseline_evaluation.ipynb   spaCy vs TAB — main experiment
-│   └── 03_mosaic_effect.ipynb         k-anonymity over QUASI fingerprints
-├── phase2_baseline_comparison/        Phase 2 — model bake-off + fine-tune
-│   ├── 01_hf_baseline.ipynb           dslim/bert-base-NER on TAB
-│   ├── 02_presidio_baseline.ipynb     Presidio (stock + custom CODE recogniser)
-│   ├── 03_finetune_roberta.ipynb      RoBERTa fine-tuned on TAB train
-│   └── 04_head_to_head.ipynb          comparison plots
-├── phase3_pipeline/                   Phase 3 — Redact vs Anonymise pipelines
-│   └── notebooks/
-│       ├── 01_lite_walkthrough.ipynb
-│       ├── 02_pro_walkthrough.ipynb
-│       └── 03_lite_vs_pro.ipynb
-├── phase4_pseudonymisation/           Phase 4 — referential tokens + restore
-│   └── notebooks/
-│       └── 01_pseudonymisation_walkthrough.ipynb
-├── phase5_coreference/                Phase 5 — coref-aware span extension
-│   ├── evaluate_mention_recall.py     TAB mention-recall evaluation
-│   ├── notebooks/01_coref_walkthrough.ipynb
-│   └── results/                       CSV + summary land here
-├── phase6_advanced_training/          Phase 6 — domain backbone + ensemble
-│   ├── notebooks/
-│   │   ├── 01_legalbert_finetune.ipynb
-│   │   ├── 02_ensemble.ipynb
-│   │   └── 03_head_to_head.ipynb
-│   └── results/                       CSVs land here after running
-├── src/anonymisation/                 reusable Python package
-│   ├── data.py mapping.py             TAB loader + spaCy mapping
-│   ├── evaluation.py                  span-level P/R/F1
-│   ├── mosaic.py                      k-anonymity over QUASI fingerprints
-│   ├── predictors.py                  HF / Presidio / fine-tuned adapters
-│   ├── ensemble.py                    EnsemblePredictor — vote-based combiner (Phase 6)
-│   ├── iob.py                         BIO tagging utilities for fine-tuning
-│   ├── device.py                      CUDA / MPS / CPU detection
-│   ├── demo.py                        Phase 1 try-it-yourself helper
-│   ├── cli.py                         CLI entry point (python -m anonymisation.cli)
-│   └── pipeline/                      Phase 3 + 4 redaction pipelines
-│       ├── types.py                   Span, AuditEntry, RedactionResult (with vault)
-│       ├── regex_pass.py              case nos, IBANs, phones, emails
-│       ├── roles.py                   DIRECT/QUASI default classifier
-│       ├── generalization.py          per-entity-type generalization rules
-│       ├── scorer.py                  MosaicScorer (k-anonymity over a haystack)
-│       ├── pseudonymise.py            Pseudonymiser + restore() (Phase 4)
-│       ├── coref.py                   CorefExtender — shorthand mention recovery (Phase 5)
-│       ├── base.py                    shared Pipeline base class
-│       ├── lite.py                    LitePipeline — DIRECT only (+ pseudonymise / coref flags)
-│       └── pro.py                     ProPipeline — DIRECT + iterate-until-safe (+ pseudonymise / coref flags)
-├── results/                           Phase 1 per-entity metrics CSV
-├── writeup/                           portfolio narrative (markdown)
-│   ├── README.md                      full v1 writeup
-│   └── SKELETON.md                    restructured v2 (3 acts + epilogue) — fill-in scaffold
-├── demo/                              Static showcase + local Gradio app
-│   ├── index.html                     static showcase (open in browser)
-│   ├── worked_example.py              one doc → Lite · Pro · pseudonymise + audit (real run)
-│   ├── build_showcase.py              regenerator script
-│   ├── examples/                      input samples
-│   ├── app.py                         Gradio interactive demo (auto-detects best NER backend)
-│   ├── requirements-gradio.txt        pinned deps for the Gradio venv
-│   └── run_gradio.sh                  bootstrap + launch script
-├── spaces/                            HuggingFace Spaces deployment bundle
-│   ├── README.md                      Spaces deploy walkthrough (+ YAML frontmatter)
-│   ├── app.py                         Spaces-tailored entry point
-│   ├── requirements.txt               Spaces deps
-│   ├── pre-build.sh                   spaCy model download on first build
-│   └── sync.sh                        refresh package + examples from main repo
-└── figures/                           plots for the writeup + portfolio site
-    ├── mosaic_reidentification.png    re-id curve (95% unique by 3 facts) + signature sizes (Act I centerpiece)
-    ├── phase_overall_f1.png           trimmed 5-bar headline ladder
-    ├── gap_closed_by_entity.png       per-entity F1 lift, P1 baseline → P2 fine-tune
-    ├── ensemble_backfire.png          Phase 6 — per-entity precision collapse of 3-way ensemble
-    ├── phase_f1_by_entity.png         per-entity-type grouped bars (all models)
-    ├── phase_precision_recall.png     precision/recall scatter (all models)
-    ├── phase_summary.png              4-panel cross-phase performance summary
-    ├── phase5_mention_recall.png      Phase 5 coref extender — measured null
-    ├── pipeline_architecture.svg/.png Lite + Pro + Pseudonymise system diagram (Act III)
-    ├── round_trip_threat_model.svg/.png  firm ↔ LLM provider trust boundary (Phase 4)
-    ├── build_performance_summary.py   regenerator — phase performance figures (from results CSVs)
-    └── build_mosaic.py                 regenerator — mosaic re-identification figure (from TAB)
+├── src/anonymisation/        the package — everything below imports this
+│   ├── predictors.py         every NER backend behind one contract:
+│   │                           text -> [(start, end, tab_type, span_text)]
+│   ├── pipeline/             Redact / Anonymise / Pseudonymise + audit log
+│   │   ├── base.py           shared detect_spans() engine
+│   │   ├── lite.py pro.py    the two redaction strategies
+│   │   ├── scorer.py         MosaicScorer — k-anonymity over a haystack
+│   │   ├── generalization.py QUASI broadening levels
+│   │   ├── pseudonymise.py   referential tokens + vault + restore()
+│   │   └── types.py          Span · AuditEntry · RedactionResult
+│   ├── mosaic.py             the re-identification analysis
+│   ├── evaluation.py         span P/R/F1, partial + exact
+│   └── cli.py                `anonymise redact` / `anonymise restore`
+├── notebooks/                01–15, in narrative order (see above)
+├── scripts/                  runnable analysis + figure builders
+├── results/                  every metric CSV/JSON, one place
+├── figures/                  generated charts and diagrams
+├── models/                   fine-tuned checkpoints (gitignored, ~8.8 GB)
+├── tests/                    52 pure-logic tests — no models, no network
+├── demo/                     Gradio app, worked example, static showcase
+├── spaces/                   HuggingFace Spaces deployment bundle
+└── docs/                     writeup + per-stage process notes
 ```
+
+**The seam worth knowing about:** every detector — spaCy, HuggingFace, Presidio, both fine-tunes, the ensemble — is normalised to one callable, `text -> [(start_char, end_char, tab_type, span_text)]`. That is why five models could be compared on identical inputs, and why adding a sixth costs about sixty lines rather than a rewrite.
 
 ---
 
 ## Setup
 
 ```bash
-git clone <this repo>
-cd "Data Anonymisation"
+git clone https://github.com/WillCatt/Data-Anonymisation.git
+cd Data-Anonymisation
 
 python -m venv legal-anon-env
-source legal-anon-env/bin/activate          # (Windows: legal-anon-env\Scripts\activate)
+source legal-anon-env/bin/activate        # Windows: legal-anon-env\Scripts\activate
 
-pip install -r requirements.txt
-python -m spacy download en_core_web_trf
-
-jupyter notebook notebooks/
+pip install -e ".[research,dev]"          # or just `pip install -e .` for the library
+python -m spacy download en_core_web_trf  # baseline / best off-the-shelf NER
+python -m spacy download en_core_web_lg    # required by Presidio's NLP engine
 ```
 
-First run of the notebooks will download TAB from HuggingFace (~50 MB, cached afterwards) and the spaCy transformer model (~440 MB). After that it's offline.
+First run downloads TAB (~50 MB) and the spaCy transformer (~440 MB), cached afterwards.
 
-If you only want to read the experiment, the writeup at `writeup/README.md` covers everything without needing to run the code.
+**Tests** need neither models nor network — every heavy import is lazy:
 
-### Lighter-weight alternative
-
-If you don't want to pull the transformer model:
-
-```python
-# In notebooks/02_baseline_evaluation.ipynb, change:
-SPACY_MODEL = "en_core_web_trf"
-# to:
-SPACY_MODEL = "en_core_web_sm"   # ~12 MB, faster, lower scores
+```bash
+pytest            # 52 tests, ~0.5s
 ```
 
-The qualitative conclusions hold — the smaller model is just worse on PERSON and ORG.
+**Try it on one document:**
+
+```bash
+python demo/worked_example.py             # Redact · Anonymise · Pseudonymise + audit log
+./demo/run_gradio.sh                      # interactive app at localhost:7860
+anonymise redact --variant pro --pseudonymise --vault-out vault.json doc.txt
+```
+
+> The Gradio demo runs in its **own** isolated venv (`demo/venv-gradio/`, bootstrapped on first run) because Gradio 4.x conflicts with the research stack. Don't install it into `legal-anon-env`.
 
 ---
 
-## How to use this repo
+## Reproducing the results
 
-| If you want to... | Start here |
+| To reproduce | Run |
 |---|---|
-| Read the story | [`writeup/README.md`](writeup/README.md) (long v1) · [`writeup/SKELETON.md`](writeup/SKELETON.md) (restructured v2 outline) |
-| See the headline result in one chart | [`figures/phase_overall_f1.png`](figures/phase_overall_f1.png) (5-bar ladder, ensemble falling-knife at the bottom) |
-| See the mosaic-effect finding | [`figures/mosaic_reidentification.png`](figures/mosaic_reidentification.png) (95% of docs unique from 3 quasi-facts; 1,268 / 1,268 at the full fingerprint) |
-| Understand the system architecture | [`figures/pipeline_architecture.png`](figures/pipeline_architecture.png) and [`figures/round_trip_threat_model.png`](figures/round_trip_threat_model.png) |
-| See the experimental setup and the EDA | [`notebooks/01_problem_setup.ipynb`](notebooks/01_problem_setup.ipynb) |
-| Reproduce the Phase 1 baseline | [`notebooks/02_baseline_evaluation.ipynb`](notebooks/02_baseline_evaluation.ipynb) |
-| Reproduce the mosaic-effect analysis | [`notebooks/03_mosaic_effect.ipynb`](notebooks/03_mosaic_effect.ipynb) |
-| Reproduce the RoBERTa fine-tune (best model) | [`phase2_baseline_comparison/03_finetune_roberta.ipynb`](phase2_baseline_comparison/03_finetune_roberta.ipynb) |
-| See a real before/after redaction | `demo/worked_example.py` (one doc through Lite · Pro · pseudonymise) |
-| Try the pipeline locally | `./demo/run_gradio.sh` (Gradio at `localhost:7860`) |
-| Reuse the code in your own project | `from anonymisation import ...` (see `src/anonymisation/__init__.py`) |
+| The detection ladder | `notebooks/02` → `06` in order |
+| The re-identification finding | `notebooks/07_reidentification_mosaic.ipynb` |
+| Coreference mention-recall | `python scripts/evaluate_mention_recall.py --sample 50` |
+| Cached predictions for combiner work | `python scripts/cache_predictions.py` |
+| The combiner sweep | `python scripts/eval_combiners.py` |
+| All figures | `python scripts/build_performance_summary.py` (and the other `build_*.py`) |
 
 ---
 
-## Roadmap
+## Limits and next
 
-- [x] **Phase 1 — Proof of concept.** Baseline measurement (spaCy F1 = 0.566) + mosaic-effect quantification (1,268 / 1,268 TAB docs uniquely identifiable from QUASI fingerprint alone).
-- [x] **Phase 2 — Baseline comparison + fine-tune.** Four models evaluated on TAB test. **RoBERTa fine-tuned on TAB wins at F1 = 0.851** (+28.5 pp over spaCy). Presidio + CASE_NUMBER = 0.603 (regex closes CODE gap but ORG noise dominates). `dslim/bert-base-NER` = 0.167 (CoNLL label set discards most of TAB's annotation — not a meaningful comparison).
-- [x] **Phase 3 — Production pipeline (two variants).** `LitePipeline` (DIRECT-only) and `ProPipeline` (DIRECT + mosaic-aware QUASI generalization). Library + CLI + walkthrough notebooks + per-decision audit log. **Product-facing names: Redact (`LitePipeline`) and Anonymise (`ProPipeline`)** — the code keeps the original class names.
-- [x] **Phase 4 — Pseudonymisation + round-trip.** `pseudonymise=True` flag on both pipelines (referential `[PERSON_A]`, `[PERSON_B]` tokens with substring-rule coreference). `restore()` helper for the LLM-answer round-trip. CLI `restore` subcommand + walkthrough notebook + showcase Sample 4 + threat-model diagram.
-- [x] **Phase 5 — Coreference-aware extension** *(measured null).* `coref_extend=True` post-processor; integrated as a defensive layer. **TAB mention-recall lift: +0.0001 macro** — spaCy is already at the recall ceiling on PERSON/ORG where the substring rule could help. Honest negative result, kept in the audit log.
-- [x] **Phase 6 — Domain backbone + ensemble** *(two measured nulls).* LegalBERT fine-tune: F1 = 0.849 — **within noise of RoBERTa-FT** (domain pretraining helps with vocabulary, not labels). 3-way ensemble (spaCy + LegalBERT + Presidio, union-vote): F1 = 0.553 — **backfired**, because Presidio's ORG precision is 0.14 and union voting inherits its worst member's noise.
-- [x] **Phase 6.2 — Combiner investigation** *(third measured null, sharpest).* Fixing the vote rule confirms union-voting *was* the cause — consensus recovers F1 0.553 → 0.795 — but **no combiner beats the single fine-tune (0.854)**. The fine-tune is the best model on all 8 labels (Pareto-dominant), so per-label routing collapses to the fine-tune alone. Ensembling only helps with *complementary* members; a second same-level fine-tune wouldn't help either. See [`phase6_advanced_training/`](phase6_advanced_training/#phase-62--does-a-smarter-combiner-rescue-the-ensemble-measured).
-- [x] **Static demo.** Self-contained `demo/index.html` — 12 examples across 4 categories. *(Portfolio trim to ~4 examples is a TODO.)*
-- [x] **Gradio interactive demo.** `./demo/run_gradio.sh` bootstraps a separate isolated venv (gitignored) and launches the app at localhost:7860.
-- [ ] **Phase 4.1 — Cross-document pseudonymisation.** Persistent registry so the same person stays the same token across documents. Real key-management questions to answer first.
-- [ ] **Phase 6.1 — CRF head on the fine-tune.** Closes the 0.85 partial vs 0.77 exact-match F1 gap. Standard NER-literature move.
-- [ ] **Phase 3.1 — Productionisation.** Docker packaging, FastAPI service, layout-aware extraction (PDF/DOCX), human-in-the-loop UI around the audit log.
-- [ ] **Fuzzy fingerprint matching for the mosaic scorer.** Currently exact surface form. Lets us sweep "how does the 100% finding change as match strictness loosens?" — the sensitivity analysis the project most needs.
+**Limits — stated plainly.**
+- **TAB is English-only and ECHR-only.** Findings are sharp on this corpus; cross-corpus validation is needed before claiming generality.
+- **Mosaic fingerprints match on exact surface form.** A real attacker matches fuzzily. The 100% number is conservative in one direction (real risk is at least this bad) and optimistic in another (a real haystack is bigger and noisier than TAB).
+- **No human ceiling established.** TAB has non-trivial annotator disagreement on identifier role. Without a human-vs-human F1, we don't know how close 0.851 is to the realistic maximum — which also means we don't know when to stop optimising.
+- **Text in, text out.** No PDF/DOCX extraction, no layout handling, no cross-document linking, no service packaging.
+
+**Next, in priority order.**
+1. **Confidence intervals and paired significance tests** on every headline number. Several "within noise" claims in this repo have never actually been tested, and the LegalBERT discrepancy above needs resolving.
+2. **Fuzzy fingerprint matching** — sweep how the 100% finding moves as match strictness loosens. The sensitivity analysis this project most needs.
+3. **Human annotator ceiling** — establish the realistic upper bound before chasing more F1.
+4. **Cross-document pseudonymisation** — a persistent registry so the same person keeps the same token across a matter. Real key-management questions first.
+5. **CRF head on the fine-tune** — closes the 0.85 partial vs 0.78 exact-match gap.
 
 ---
 
-## License + acknowledgments
+## License and acknowledgments
 
-TAB is the work of Pilán et al. at the Norwegian Computing Center, distributed under its own license — see the [original repo](https://github.com/NorskRegnesentral/text-anonymization-benchmark) for terms.
+TAB is the work of Pilán et al. at the Norwegian Computing Center, distributed under its own license — see the [original repo](https://github.com/NorskRegnesentral/text-anonymization-benchmark). k-anonymity framing follows Sweeney (2002). spaCy by Explosion AI; Presidio by Microsoft.
 
-This project is for portfolio / educational use; it is not a substitute for legal or compliance advice.
+This is a portfolio and research project. It is not a substitute for legal or compliance advice, and it is not a production-hardened product.

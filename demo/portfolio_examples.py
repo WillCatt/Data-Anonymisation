@@ -57,7 +57,7 @@ DOC_PSEUDO = (
 
 
 def build_best_ner():
-    finetuned = ROOT / "phase2_baseline_comparison" / "checkpoints" / "roberta-tab" / "final"
+    finetuned = ROOT / "models" / "roberta-tab" / "final"
     if finetuned.exists():
         print(f"NER backend: fine-tuned RoBERTa ({finetuned.relative_to(ROOT)})\n")
         return build_ner_provider("finetuned", str(finetuned))

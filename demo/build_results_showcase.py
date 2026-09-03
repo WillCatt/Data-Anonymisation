@@ -30,7 +30,7 @@ from anonymisation.cli import build_ner_provider          # noqa: E402
 from anonymisation.pipeline import LitePipeline            # noqa: E402
 from anonymisation.pipeline.pseudonymise import restore    # noqa: E402
 
-FINETUNED = ROOT / "phase2_baseline_comparison" / "checkpoints" / "roberta-tab" / "final"
+FINETUNED = ROOT / "models" / "roberta-tab" / "final"
 OUT = ROOT / "demo" / "results_showcase.json"
 
 # Documents chosen to exercise names, organisations, dates and reference/case

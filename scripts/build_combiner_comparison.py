@@ -1,8 +1,8 @@
 """
 Build the Phase 6.2 combiner-comparison figure.
 
-Reads phase6_advanced_training/results/combiner_comparison.csv (produced by
-phase6_advanced_training/scripts/eval_combiners.py) and writes a single
+Reads results/combiner_comparison.csv (produced by
+scripts/eval_combiners.py) and writes a single
 bar chart of partial-match F1 across the combiner strategies, with the
 LegalBERT-alone "ceiling" drawn as a reference line.
 
@@ -22,7 +22,7 @@ import pandas as pd
 import seaborn as sns
 
 ROOT = Path(__file__).resolve().parent.parent
-CSV = ROOT / "phase6_advanced_training" / "results" / "combiner_comparison.csv"
+CSV = ROOT / "results" / "combiner_comparison.csv"
 OUT = ROOT / "figures" / "phase6_combiner_comparison.png"
 
 sns.set_theme(style="whitegrid", font_scale=0.95)

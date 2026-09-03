@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "anonymisation"
+version = "0.1.0"
+description = "PII detection, re-identification risk scoring and pseudonymised LLM round-trips for confidential text"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "William Catt" }]
+
+# Deliberately minimal. The package imports without torch/spaCy/datasets because
+# every model-dependent import is lazy — which is what lets CI run the full test
+# suite on pytest + pandas alone. Heavy stacks live in the optional extras below.
+dependencies = ["pandas>=2.0"]
+
+[project.optional-dependencies]
+# Everything needed to reproduce the analysis notebooks and train the models.
+research = [
+  "datasets>=2.14",
+  "transformers>=4.35",
+  "torch>=2.1",
+  "spacy>=3.7",
+  "presidio-analyzer>=2.2",
+  "matplotlib>=3.8",
+  "seaborn>=0.13",
+  "jupyter",
+]
+dev = ["pytest>=7.4"]
+
+[project.scripts]
+anonymise = "anonymisation.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
