@@ -245,16 +245,34 @@ three false pairs for every one it missed.
 
 | | pairwise precision | recall | F1 |
 |---|---|---|---|
-| One substring rule for every type | 0.791 | 0.918 | 0.850 [0.821, 0.874] |
-| Calibrated per rule and entity type | **0.957** | 0.857 | 0.904 [0.882, 0.922] |
+| One rule, every type, no bar | 0.790 | 0.934 | 0.856 [0.828, 0.880] |
+| Calibrated, acronym rule off | 0.956 | 0.850 | 0.900 [0.878, 0.918] |
+| Calibrated, scope gate lifted | 0.956 | 0.875 | 0.914 [0.893, 0.930] |
+| **Shipped default** | **0.957** | 0.861 | 0.906 [0.886, 0.924] |
 
-False pairs fall from 4,539 to 727. But the per-type split is the finding, not
-the headline: **PERSON barely moves (0.854 → 0.863)** while DATETIME, CODE,
+False pairs fall from 4,623 to 729. But the per-type split is the finding, not
+the headline: **PERSON barely moves (0.854 → 0.864)** while DATETIME, CODE,
 LOC, DEM, MISC and QUANTITY all go to 1.000. The rule was never broken at the
 job it was written for — introduce a party in full, then use the surname. It
 was being applied to all eight entity types, including the ones where two
 mentions sharing a token are emphatically not the same thing. `1989` and
 `June 1989` are not the same date.
+
+So coreference is now **scoped to people and organisations**. Everything else
+links on an exact repeat of the surface form and nothing else. Of the 1,061
+gold clusters spanning more than one surface form, 886 are PERSON or ORG;
+DATETIME has one. The scope is not free — it costs 1.4 points of recall, all
+of it MISC and DEM initialisms — and the middle rows above cost it, rather
+than leaving it as an assumption.
+
+It also turned out the linker was missing the short form legal drafting uses
+most. `World Health Organisation` and `WHO` share no words, so no containment
+rule could ever see them. An initialism tier scores **0.77** on ORG (0.71 for
+the looser reading that lets a word drop, `the Trent Regional Health
+Authority` … `RHA`) and is worth **+1.1 points of recall at no cost in
+precision** — the cleanest win of the lot. On PERSON it scores 0.31, because
+`Mr Zbigniew Majchrzak` … `M.M.` is usually a different person, so it does not
+apply there.
 
 Each rule now carries its measured precision — an exact repeat of a surface
 form is the same entity 35,183 times out of 35,183; reverse containment is
@@ -294,7 +312,7 @@ Reproduce: `python scripts/evaluate_coref_links.py --profile` · `--fit` · (no 
 ├── results/                  every metric CSV/JSON, one place
 ├── figures/                  generated charts and diagrams
 ├── models/                   fine-tuned checkpoints (gitignored, ~8.8 GB)
-├── tests/                    77 pure-logic tests — no models, no network
+├── tests/                    81 pure-logic tests — no models, no network
 ├── demo/                     Gradio app, worked example, static showcase
 ├── spaces/                   HuggingFace Spaces deployment bundle
 └── docs/                     writeup + per-stage process notes

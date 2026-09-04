@@ -38,7 +38,10 @@ What it measures
 
 3. default      — the held-out evaluation on test: pairwise precision, recall
    and F1 of the induced clusters against gold, per policy and per entity
-   type, with 95% cluster-bootstrap intervals over the 127 unique judgments
+   type — including `calibrated_no_initialism` and `calibrated_all_types`,
+   which turn off the acronym rule and the PERSON/ORG scope gate respectively,
+   so each is costed on its own — with 95% cluster-bootstrap intervals over
+   the 127 unique judgments
    (see `bootstrap_ci.py` for why the resampling unit is not the 555 rows),
    plus a sweep of the confidence threshold and the precision of merges
    where two or more entities matched equally well.
@@ -423,6 +426,13 @@ def main() -> None:
     for label, kwargs in (
         ("legacy", {"link_policy": "legacy"}),
         ("calibrated_no_guard", {"link_policy": "calibrated", "reject_ambiguous": False}),
+        ("calibrated_no_initialism", {
+            "link_policy": "calibrated",
+            "disabled_evidence": ("initialism", "initialism_loose", "initialism_reverse"),
+        }),
+        ("calibrated_all_types", {"link_policy": "calibrated",
+                                  "coref_types": ("PERSON", "ORG", "LOC", "DATETIME",
+                                                  "DEM", "MISC", "CODE", "QUANTITY")}),
         ("calibrated", {"link_policy": "calibrated"}),
     ):
         frame, counts = evaluate_policy(dataset, args.split, **kwargs)

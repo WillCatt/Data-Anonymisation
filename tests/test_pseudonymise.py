@@ -103,7 +103,10 @@ def test_the_classifier_only_returns_known_tiers():
     pairs = [("Petrova", "Petrova"), ("the Board", "The Board"),
              ("Nihat Osal", "Mr Nihat Osal"), ("Petrova", "Maria Petrova"),
              ("Sofia District", "Sofia District Court"), ("June 1989", "1989"),
-             ("Northwind Energy Ltd", "Northwind Energy"), ("", "x"), ("x", "")]
+             ("Northwind Energy Ltd", "Northwind Energy"),
+             ("WHO", "World Health Organisation"),
+             ("RHA", "the Trent Regional Health Authority"),
+             ("World Health Organisation", "WHO"), ("", "x"), ("x", "")]
     seen = {classify_link_evidence(new, old) for new, old in pairs} - {None}
     assert seen <= set(LINK_EVIDENCE_TIERS)
     assert seen == set(LINK_EVIDENCE_TIERS)      # all seven are reachable
@@ -134,9 +137,10 @@ def test_decisions_record_why_each_token_was_assigned():
 
 
 def test_a_rejected_link_is_still_recorded():
+    # Reverse containment on ORG scores 0.125 — a real candidate, too weak to act on.
     ps = Pseudonymiser()
-    ps.token_for("DATETIME", "1989")
-    ps.token_for("DATETIME", "June 1989")
+    ps.token_for("ORG", "United Kingdom")
+    ps.token_for("ORG", "United Kingdom Government")
     rejected = ps.decisions[-1]
     assert not rejected.merged
     assert rejected.refusal == "below_threshold"
@@ -164,6 +168,61 @@ def test_an_ambiguous_link_is_refused():
     loose.token_for("PERSON", "Jane Smith")
     assert loose.token_for("PERSON", "Smith") == "[PERSON_A]"
     assert loose.decisions[-1].ambiguous
+
+
+def test_an_organisation_links_to_its_initialism():
+    # The pattern the substring rule could never see: the full name and its
+    # acronym share no words at all.
+    ps = Pseudonymiser()
+    full = ps.token_for("ORG", "World Health Organisation")
+    assert ps.token_for("ORG", "WHO") == full
+    assert ps.decisions[-1].evidence == "initialism"
+
+    # One word dropped is still worth catching, at a lower confidence.
+    loose = Pseudonymiser()
+    authority = loose.token_for("ORG", "the Trent Regional Health Authority")
+    assert loose.token_for("ORG", "RHA") == authority
+    assert loose.decisions[-1].evidence == "initialism_loose"
+    assert (LINK_CONFIDENCE[("initialism_loose", "ORG")]
+            < LINK_CONFIDENCE[("initialism", "ORG")])
+
+
+def test_initialisms_are_not_applied_to_people():
+    # "Mr Zbigniew Majchrzak" then "M.M." reads like an initialism and scored
+    # 0.31 on TAB — below the bar, and PERSON-shaped initials are usually a
+    # different person.
+    ps = Pseudonymiser()
+    assert ps.token_for("PERSON", "Mr Zbigniew Majchrzak") == "[PERSON_A]"
+    assert ps.token_for("PERSON", "M.M.") == "[PERSON_B]"
+
+
+def test_coreference_is_only_attempted_for_names_and_organisations():
+    # A repeated date still shares a token — that is identity, not coreference.
+    ps = Pseudonymiser()
+    assert ps.token_for("DATETIME", "3 March 1999") == "[DATETIME_A]"
+    assert ps.token_for("DATETIME", "3 March 1999") == "[DATETIME_A]"
+    # But no rule gets to decide that two different dates are one date.
+    assert ps.token_for("DATETIME", "March 1999") == "[DATETIME_B]"
+    assert ps.token_for("CODE", "22") == "[CODE_A]"
+    assert ps.token_for("CODE", "22/1") == "[CODE_B]"
+
+    refused = [d for d in ps.decisions if d.refusal == "type_not_linkable"]
+    assert refused, "the refusal should be recorded, not silent"
+    assert "not attempted for" in refused[0].describe()
+
+    # The gate is configurable, but it is belt and braces: widen it and the
+    # merge is still refused, now for the reason the measurement gives.
+    wide = Pseudonymiser(coref_types=("PERSON", "ORG", "DATETIME"))
+    wide.token_for("DATETIME", "1989")
+    assert wide.token_for("DATETIME", "June 1989") == "[DATETIME_B]"
+    assert wide.decisions[-1].refusal == "below_threshold"
+
+
+def test_legacy_policy_ignores_the_type_gate():
+    # Legacy exists to reproduce the pre-measurement behaviour in full.
+    legacy = Pseudonymiser(link_policy="legacy")
+    assert legacy.token_for("DATETIME", "1989") == "[DATETIME_A]"
+    assert legacy.token_for("DATETIME", "June 1989") == "[DATETIME_A]"
 
 
 def test_link_policy_must_be_known():

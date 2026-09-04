@@ -57,6 +57,13 @@ notebook 17. Two results drove the default policy:
     inside a longer new one, `1989` then `June 1989` — is right about 5%
     of the time.
 
+Two things bound what any of that can do. Coreference is only attempted for
+`LINKABLE_TYPES` — PERSON and ORG — because "introduce in full, then use a
+short form" is a habit of naming; the shorthand for a date is not a shorter
+name for the same date. And the short form legal drafting actually uses is
+often an initialism, so `World Health Organisation` … `WHO` is caught by its
+own rule rather than left to a substring test that cannot see it.
+
 `Pseudonymiser` therefore takes a `link_policy`. Under `"calibrated"` (the
 default) it scores every candidate and merges only on the best evidence
 above `min_link_confidence`; under `"legacy"` it reproduces the original
@@ -69,7 +76,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 
 # ---------------------------------------------------------------------------
@@ -113,11 +120,79 @@ LINK_EVIDENCE_TIERS = (
     "exact",
     "exact_casefold",
     "honorific_only",
+    "initialism",
+    "initialism_loose",
+    "initialism_reverse",
     "short_in_long_1tok",
     "short_in_long_multi",
     "long_over_short_1tok",
     "long_over_short_multi",
 )
+
+# Coreference is only attempted for these types. Everything else links on an
+# exact repeat of the surface form and nothing else.
+#
+# This is a scope decision before it is a statistical one. "Introduce the
+# entity in full, then use a short form" is a habit of *naming* — people and
+# organisations — and the shorthand for a date or a case number is not a
+# shorter name for the same thing, it is a different date or a different
+# number. The measurement agrees: of the 1,061 gold clusters in the TAB test
+# split that span more than one surface form, 886 are PERSON or ORG, DATETIME
+# has exactly one, and CODE has none.
+#
+# For DATETIME, CODE, LOC and QUANTITY the gate changes nothing — the
+# confidence threshold already excluded every rule on them. It bites on MISC
+# and DEM, where an initialism ("post-traumatic stress disorder" … "PTSD")
+# scores 0.52-0.65 and is usually right: the gate gives up 263 true pairs on
+# the TAB test split to avoid 27 false ones, and costs 1.4 points of pairwise
+# recall overall. That is a scope decision, not a free win, and notebook 17
+# reports it as one. What it buys is that a descriptor is never asserted to be
+# an identity, and that a later recalibration cannot quietly re-admit dates.
+LINKABLE_TYPES: Tuple[str, ...] = ("PERSON", "ORG")
+
+# Words skipped when reading the initials off a phrase.
+_ACRONYM_STOPWORDS: Set[str] = {
+    "the", "of", "and", "for", "a", "an", "in", "on", "at", "to",
+    "de", "la", "le", "du", "des", "von", "van", "für", "y",
+}
+_WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
+
+
+def _acronym_letters(form: str) -> Optional[str]:
+    """Uppercase letters of an acronym-shaped token: 'W.H.O.' -> 'WHO'."""
+    bare = form.replace(".", "").replace(" ", "").strip()
+    if len(bare) < 2 or not bare.isalpha() or not bare.isupper():
+        return None
+    return bare
+
+
+def _initials(phrase: str) -> Tuple[str, int]:
+    """Initials of a phrase's significant words, and how many there were."""
+    words = [w for w in _WORD_RE.findall(phrase) if w.lower() not in _ACRONYM_STOPWORDS]
+    return "".join(w[0] for w in words).upper(), len(words)
+
+
+def _initialism_of(short: str, long: str) -> Optional[str]:
+    """
+    Is `short` an initialism of `long`? Returns the strength, or None.
+
+    "WHO" for "World Health Organisation" is exact — every significant word
+    contributes its letter, in order. "RHA" for "the Trent Regional Health
+    Authority" drops one, which is common enough in legal drafting to be worth
+    catching and loose enough to be worth scoring separately.
+    """
+    letters = _acronym_letters(short)
+    if letters is None:
+        return None
+    initials, word_count = _initials(long)
+    if word_count < 2:
+        return None
+    if letters == initials:
+        return "initialism"
+    remaining = iter(initials)
+    if all(letter in remaining for letter in letters):   # order-preserving subsequence
+        return "initialism_loose"
+    return None
 
 
 def classify_link_evidence(new_form: str, existing_form: str) -> Optional[str]:
@@ -138,6 +213,15 @@ def classify_link_evidence(new_form: str, existing_form: str) -> Optional[str]:
     existing_clean = _strip_honorifics(existing).lower()
     if new_clean == existing_clean:
         return "honorific_only"
+    # Checked before containment: an all-caps token matching the initials is a
+    # more specific account of the pair than merely appearing inside it, and
+    # scores higher. Acronym shape is restrictive, so ordinary shorthand
+    # ("Sofia District" in "Sofia District Court") is unaffected.
+    forward = _initialism_of(new, existing)
+    if forward is not None:
+        return forward
+    if _initialism_of(existing, new) is not None:
+        return "initialism_reverse"
     if _is_word_substring(new_clean, existing_clean):
         return "short_in_long_1tok" if len(new_clean.split()) == 1 else "short_in_long_multi"
     if _is_word_substring(existing_clean, new_clean):
@@ -163,20 +247,31 @@ LINK_CONFIDENCE: Dict[Tuple[str, str], float] = {
 
     ("honorific_only", "PERSON"): 0.665,
 
-    ("long_over_short_1tok", "DATETIME"): 0.000, ("long_over_short_1tok", "ORG"): 0.095,
-    ("long_over_short_1tok", "PERSON"): 0.222, ("long_over_short_1tok", "LOC"): 0.017,
-    ("long_over_short_1tok", "MISC"): 0.008, ("long_over_short_1tok", "DEM"): 0.036,
-    ("long_over_short_1tok", "CODE"): 0.063, ("long_over_short_1tok", "QUANTITY"): 0.028,
+    ("initialism", "ORG"): 0.767, ("initialism", "PERSON"): 0.313,
+    ("initialism", "MISC"): 0.523, ("initialism", "LOC"): 0.484,
+    ("initialism", "DEM"): 0.527,
 
-    ("long_over_short_multi", "ORG"): 0.124, ("long_over_short_multi", "DATETIME"): 0.003,
-    ("long_over_short_multi", "MISC"): 0.139, ("long_over_short_multi", "PERSON"): 0.203,
+    ("initialism_loose", "ORG"): 0.708, ("initialism_loose", "MISC"): 0.651,
+    ("initialism_loose", "PERSON"): 0.367, ("initialism_loose", "DEM"): 0.573,
+    ("initialism_loose", "LOC"): 0.529, ("initialism_loose", "CODE"): 0.628,
+
+    ("initialism_reverse", "ORG"): 0.414, ("initialism_reverse", "PERSON"): 0.463,
+    ("initialism_reverse", "MISC"): 0.390, ("initialism_reverse", "DEM"): 0.456,
+
+    ("long_over_short_1tok", "DATETIME"): 0.000, ("long_over_short_1tok", "ORG"): 0.095,
+    ("long_over_short_1tok", "LOC"): 0.016, ("long_over_short_1tok", "PERSON"): 0.227,
+    ("long_over_short_1tok", "MISC"): 0.008, ("long_over_short_1tok", "DEM"): 0.035,
+    ("long_over_short_1tok", "CODE"): 0.062, ("long_over_short_1tok", "QUANTITY"): 0.027,
+
+    ("long_over_short_multi", "ORG"): 0.125, ("long_over_short_multi", "DATETIME"): 0.003,
+    ("long_over_short_multi", "MISC"): 0.139, ("long_over_short_multi", "PERSON"): 0.209,
     ("long_over_short_multi", "LOC"): 0.045, ("long_over_short_multi", "QUANTITY"): 0.046,
     ("long_over_short_multi", "DEM"): 0.051,
 
-    ("short_in_long_1tok", "PERSON"): 0.635, ("short_in_long_1tok", "ORG"): 0.625,
-    ("short_in_long_1tok", "DATETIME"): 0.018, ("short_in_long_1tok", "LOC"): 0.175,
-    ("short_in_long_1tok", "MISC"): 0.400, ("short_in_long_1tok", "DEM"): 0.210,
-    ("short_in_long_1tok", "QUANTITY"): 0.293,
+    ("short_in_long_1tok", "PERSON"): 0.640, ("short_in_long_1tok", "DATETIME"): 0.017,
+    ("short_in_long_1tok", "ORG"): 0.612, ("short_in_long_1tok", "LOC"): 0.176,
+    ("short_in_long_1tok", "MISC"): 0.237, ("short_in_long_1tok", "DEM"): 0.207,
+    ("short_in_long_1tok", "QUANTITY"): 0.287,
 
     ("short_in_long_multi", "ORG"): 0.339, ("short_in_long_multi", "DATETIME"): 0.014,
     ("short_in_long_multi", "PERSON"): 0.440, ("short_in_long_multi", "MISC"): 0.244,
@@ -190,9 +285,12 @@ LINK_CONFIDENCE_PRIOR: Dict[str, float] = {
     "exact": 1.000,
     "exact_casefold": 0.016,
     "honorific_only": 0.665,
-    "long_over_short_1tok": 0.032,
+    "initialism": 0.580,
+    "initialism_loose": 0.609,
+    "initialism_reverse": 0.429,
+    "long_over_short_1tok": 0.031,
     "long_over_short_multi": 0.076,
-    "short_in_long_1tok": 0.468,
+    "short_in_long_1tok": 0.459,
     "short_in_long_multi": 0.264,
 }
 
@@ -230,7 +328,8 @@ class LinkDecision:
     tied_candidates: int = 1
     # Why a candidate that matched was not merged: "below_threshold" when the
     # best evidence was too weak, "ambiguous" when several entities matched
-    # equally well. None when nothing was refused.
+    # equally well, "type_not_linkable" when the entity type is outside
+    # `coref_types`. None when nothing was refused.
     refusal: Optional[str] = None
 
     @property
@@ -245,6 +344,13 @@ class LinkDecision:
     def describe(self) -> str:
         """One line for the audit log."""
         if not self.merged:
+            if self.refusal == "type_not_linkable":
+                best = max(self.rejected, key=lambda r: r[2])
+                return (
+                    f"{self.surface_form!r} → {self.token} (new entity); {best[0]!r} matched by "
+                    f"{best[1]}, but coreference is not attempted for {self.entity_type} — "
+                    f"only an exact repeat links"
+                )
             if self.refusal == "ambiguous":
                 forms = ", ".join(sorted({r[0] for r in self.rejected}))
                 return (
@@ -306,6 +412,12 @@ class Pseudonymiser:
     # pipeline did before the links were measured.
     link_policy: str = "calibrated"
     min_link_confidence: float = DEFAULT_MIN_LINK_CONFIDENCE
+    # Entity types coreference is attempted for. Everything else links only on
+    # an exact repeat of the surface form. See LINKABLE_TYPES.
+    coref_types: Tuple[str, ...] = LINKABLE_TYPES
+    # Evidence tiers to ignore entirely. Empty in the product; the point of it
+    # is to measure what one rule contributes by running without it.
+    disabled_evidence: Tuple[str, ...] = ()
     # Refuse a merge when two or more entities match equally well — "Mr
     # Ravnsborg" after both "Mr Göran Ravnsborg" and a second Ravnsborg. Such
     # links are right 23% / 25% / 46% of the time on train / validation /
@@ -405,7 +517,7 @@ class Pseudonymiser:
             if existing_type != entity_type:
                 continue
             evidence = classify_link_evidence(new_form, existing_form)
-            if evidence is None:
+            if evidence is None or evidence in self.disabled_evidence:
                 continue
             candidates.append(
                 (existing_token, evidence, link_confidence(evidence, entity_type), existing_form)
@@ -415,11 +527,21 @@ class Pseudonymiser:
             return None, NEW_ENTITY, None, None, (), 1, None
 
         if self.link_policy == "legacy":
-            # First match in insertion order wins, whatever the evidence. The
-            # confidence is still reported; it just isn't enforced.
+            # First match in insertion order wins, whatever the evidence, for
+            # any entity type. Reproducing the pre-measurement behaviour in
+            # full is the point of keeping it, so the type gate below does not
+            # apply here — notebook 17 measures one against the other.
             token, evidence, confidence, matched_form = candidates[0]
             tied = len({c[0] for c in candidates if c[1] == evidence})
             return token, evidence, confidence, matched_form, (), tied, None
+
+        # Coreference is a claim about naming, so it is only attempted for the
+        # types that have names. A repeated date still gets its token from the
+        # exact-match fast path above; what it does not get is a rule deciding
+        # that "1989" and "June 1989" are the same thing.
+        if entity_type not in self.coref_types:
+            rejected = tuple((form, ev, conf) for _, ev, conf, form in candidates)
+            return None, NEW_ENTITY, None, None, rejected, 1, "type_not_linkable"
 
         # Calibrated: strongest evidence wins, ties broken by insertion order
         # (`max` is stable), and weak evidence is not evidence.
