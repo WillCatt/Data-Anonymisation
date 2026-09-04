@@ -1,0 +1,25 @@
+ENGAGEMENT SURVEY — FREE-TEXT COMMENT EXPORT (SYNTHETIC)
+
+Survey: Q1 FY25 Engagement Pulse. Cycle ID ENG-2025-Q1-0043. Fielded 3 February 2025 to 17 February 2025. Population 1,240. Response rate 78%. Export generated 21 February 2025 by the People Analytics team.
+
+Comment 1 — Engineering, Platform, tenure 3–5 years
+"The reorg in November was handled badly. Priya Raghavan told the platform team on 12 November 2024 that nothing would change, and six weeks later we lost two engineers to the payments squad. I have been here four years and this is the first time I have thought about leaving."
+
+Comment 2 — Customer Success, EMEA, tenure under 1 year
+"I joined from Zendesk in September and the onboarding was excellent. My manager, Daniel Roche, has been genuinely supportive. The only issue is that as the only wheelchair user on the Dublin floor I still cannot get into meeting room 4B, which I raised on 8 January 2025 and again on 3 February 2025."
+
+Comment 3 — Engineering, Data, tenure 5+ years
+"Pay bands have not moved with inflation. I am a senior data engineer on £94,000 and a peer who joined last quarter is on £108,000. I raised this with Callum Beattie in my 1:1 on 20 January. He said the review is 'above his level'."
+
+Comment 4 — Sales, ANZ, tenure 1–3 years
+"Quota was raised 22% with no change to territory. Three of the eight AEs in Melbourne missed target in Q4 and two have since resigned. Morale in the Melbourne office is the worst I have seen since I joined in 2023."
+
+Comment 5 — People and Culture, tenure 1–3 years
+"I am one of two people in the DEI function and I am also the only Black woman in the leadership meeting. Being asked to run the Race at Work network on top of my role is not recognition, it is unpaid work. I said this to Amara Okonjo-Bright on 4 February 2025."
+
+Comment 6 — Engineering, Platform, tenure under 1 year
+"Good team, unclear roadmap. Returning from parental leave in March and nobody has told me what I am coming back to."
+
+ANALYST NOTE
+
+Comments 2, 3 and 5 were flagged under the Comments Group Minimum threshold of 4 and withheld from manager-level dashboards. Comment 5 remains identifying at the executive level: the combination of function, ethnicity, gender and network responsibility resolves to one individual regardless of the name being removed. Escalated to the Head of People Analytics on 24 February 2025 under process ref PA-CONF-118.

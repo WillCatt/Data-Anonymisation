@@ -60,8 +60,26 @@ class ProPipeline(Pipeline):
         )
 
         # Phase A — suppress every DIRECT span unconditionally
-        direct_spans = [s for s in spans if s.identifier_role == "DIRECT"]
+        #
+        # Except those the caller has chosen to keep. An exempt QUASI still
+        # goes into `quasi_spans`, because it still fingerprints: keeping a
+        # date in the clear makes the document *more* identifying, and the k
+        # this loop reports has to say so. What it does not do is get
+        # broadened, so it sits at level 0 for the whole run.
+        kept_spans = [s for s in spans if s.entity_type in self.exempt_types]
+        direct_spans = [s for s in spans if s.identifier_role == "DIRECT"
+                        and s.entity_type not in self.exempt_types]
         quasi_spans = [s for s in spans if s.identifier_role == "QUASI"]
+        generalisable = [s for s in quasi_spans if s.entity_type not in self.exempt_types]
+
+        for s in kept_spans:
+            audit.append(AuditEntry(
+                span=s, action="leave",
+                rationale=(
+                    f"{s.entity_type} kept by request; it stays as written and "
+                    f"still counts towards the re-identification risk below."
+                ),
+            ))
 
         for s in direct_spans:
             if pseudo is not None:
@@ -84,7 +102,7 @@ class ProPipeline(Pipeline):
 
         # If already safe, no QUASI work needed
         if initial_k >= self.k_target:
-            for s in quasi_spans:
+            for s in generalisable:
                 audit.append(AuditEntry(
                     span=s,
                     action="leave",
@@ -113,14 +131,14 @@ class ProPipeline(Pipeline):
             if level > self.max_iterations:
                 break
 
-            for s in quasi_spans:
+            for s in generalisable:
                 s.generalization_level = level
                 s.replacement = generalize(s.entity_type, s.text, level)
 
             sig = self._signature_from_quasi(quasi_spans)
             current_k = self.scorer.k_for(sig)
 
-            for s in quasi_spans:
+            for s in generalisable:
                 audit.append(AuditEntry(
                     span=s,
                     action="generalize",
@@ -137,7 +155,7 @@ class ProPipeline(Pipeline):
 
         # Phase D — final suppression fallback if we ran out of iterations
         if not converged and iterations_used >= self.max_iterations:
-            for s in quasi_spans:
+            for s in generalisable:
                 if s.generalization_level < MAX_LEVEL:
                     s.generalization_level = MAX_LEVEL
                     s.replacement = generalize(s.entity_type, s.text, MAX_LEVEL)
@@ -161,7 +179,7 @@ class ProPipeline(Pipeline):
         # is full suppression regardless of whether it happened inside the
         # iterate loop (k_target trivially satisfied by an empty signature)
         # or via the explicit Phase D fallback. Either way, not "converged".
-        if quasi_spans and all(s.generalization_level >= MAX_LEVEL for s in quasi_spans):
+        if generalisable and all(s.generalization_level >= MAX_LEVEL for s in generalisable):
             converged = False
 
         redacted_text = self.apply_replacements(text, spans)

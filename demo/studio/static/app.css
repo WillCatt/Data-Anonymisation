@@ -418,3 +418,32 @@ body {
 .linkledger .is-strong { color: #2c6e49; font-weight: 600; }
 .linkledger .is-fair   { color: var(--ochre-deep); font-weight: 600; }
 .linkledger .is-weak   { color: var(--stamp); font-weight: 600; }
+
+/* Keeping a kind of identifier in the clear — the reader's call, not the
+   pipeline's. A kept row is struck through in the tally so the choice is
+   visible at a glance rather than only in the output. */
+.tally .keep { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+.tally .keep input { accent-color: var(--ink); cursor: pointer; }
+.tally li.is-kept > span:nth-child(2) strong { text-decoration: line-through; opacity: 0.55; }
+.tally li.is-kept .swatch { opacity: 0.3; }
+.keep-summary {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-left: 2px solid var(--ochre-deep);
+  background: rgba(217, 183, 64, 0.10);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+/* Compact form of the same toggles, for the output tabs. */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px 3px 7px;
+  border: 1px solid var(--rule); border-radius: 999px;
+  font-size: 11px; letter-spacing: 0.02em; cursor: pointer;
+  background: var(--sheet);
+}
+.chip input { margin: 0; accent-color: var(--ink); cursor: pointer; }
+.chip.is-kept { border-color: var(--ochre-deep); background: rgba(217, 183, 64, 0.12); }
+.chip.is-kept span { text-decoration: line-through; color: var(--ochre-deep); }

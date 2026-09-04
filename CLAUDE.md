@@ -66,6 +66,8 @@ This is the seam the whole package is built on. `src/anonymisation/predictors.py
 
 Replacements are applied in **reverse offset order** so earlier character offsets stay valid (`apply_replacements`).
 
+**`exempt_types`** (on both pipelines) keeps a chosen entity type in the clear — a firm that needs the dates for a limitation argument should not have to choose between that and redaction. The rule that keeps it honest: an exempt span is still detected and **still counted in the mosaic fingerprint**, so keeping dates makes the reported k *worse* rather than making the risk disappear. Do not "optimise" this by dropping exempt spans from the signature; the whole point is that the reported risk describes the document that actually leaves the building. The Studio exposes it as a per-type checkbox.
+
 ### Pseudonymisation & round-trip
 With `pseudonymise=True`, redacted entities become stable referential tokens (`[PERSON_A]`, `[PERSON_B]`, …) instead of flat `[TYPE]` tags, and a **pseudonym vault** (token → original surface form) is returned on the result.
 

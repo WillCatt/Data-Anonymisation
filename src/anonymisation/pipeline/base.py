@@ -10,7 +10,7 @@ Subclasses override `_redact()` to provide their actual redaction policy.
 """
 from __future__ import annotations
 
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, Iterable, List, Optional, Tuple
 
 from .coref import extend_with_coref
 from .types import AuditEntry, IdentifierRole, RedactionResult, Span
@@ -37,11 +37,18 @@ class Pipeline:
         run_regex: bool = True,
         coref_extend: bool = True,
         role_override: Optional[RoleOverride] = None,
+        exempt_types: Iterable[str] = (),
     ):
         self.ner_provider = ner_provider
         self.run_regex = run_regex
         self.coref_extend = coref_extend
         self.role_override = role_override
+        # Entity types the caller has chosen to keep in the clear. They are
+        # still *detected* and still counted in the mosaic fingerprint — the
+        # only thing that changes is that nothing is written over them. A
+        # kept date does not stop being a quasi-identifier, so the reported
+        # re-identification risk goes up rather than quietly ignoring it.
+        self.exempt_types = frozenset(exempt_types)
 
     # ------------------------------------------------------------------ #
     # Span detection — shared by both pipelines

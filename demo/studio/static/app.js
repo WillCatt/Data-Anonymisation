@@ -24,6 +24,7 @@ const state = {
   mode: "source",
   selected: null,
   proPseudo: false,      // pseudonymise on top of the Anonymise pipeline
+  keepTypes: [],         // entity kinds the reader has chosen to leave in the clear
   kTarget: 5,
   maxIters: 3,
   health: null,
@@ -111,6 +112,24 @@ function applyMode() {
 /* ---------------------------------------------------------------- *
  * Side panel — different question per mode
  * ---------------------------------------------------------------- */
+// The same choice, in a form that fits under an output. Being able to keep a
+// kind of identifier only from the Source tab would mean stepping away from
+// the thing the choice changes.
+function keepControls(d) {
+  const types = Object.keys(d.counts || {}).sort();
+  if (!types.length) return "";
+  const chips = types.map((type) => {
+    const kept = state.keepTypes.includes(type);
+    return `<label class="chip ${kept ? "is-kept" : ""}">
+      <input type="checkbox" class="keep-box" data-type="${esc(type)}" ${kept ? "" : "checked"}>
+      <span>${esc(type)}</span></label>`;
+  }).join("");
+  return `<h3>What to redact</h3>
+    <div class="chips">${chips}</div>
+    <p class="note">Untick to keep that kind in the document. Kept identifiers still
+    count towards the risk above.</p>`;
+}
+
 function renderPanel() {
   if (state.selected) return renderInspector();
   const panel = $("panel");
@@ -122,10 +141,14 @@ function renderPanel() {
     const quasi = d.entities.filter((e) => e.role === "QUASI").length;
     const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([type, n]) => {
       const role = d.roles[type] || "DIRECT";
-      return `<li>
+      const kept = state.keepTypes.includes(type);
+      return `<li class="${kept ? "is-kept" : ""}">
         <span class="swatch ${role === "DIRECT" ? "swatch-direct" : "swatch-quasi"}"></span>
         <span><strong>${esc(type)}</strong><br><span class="role">${esc(TYPE_MEANING[type] || "")}</span></span>
-        <span class="n">${n}</span></li>`;
+        <label class="keep" title="Untick to leave this kind of identifier in the document">
+          <input type="checkbox" class="keep-box" data-type="${esc(type)}" ${kept ? "" : "checked"}>
+          <span class="n">${n}</span>
+        </label></li>`;
     }).join("");
 
     const coref = d.coref.added.length
@@ -141,9 +164,15 @@ function renderPanel() {
       <p class="lede">${direct} must be removed. ${quasi} are quasi-identifiers —
       harmless alone, identifying in combination.</p>
       <h3>By kind</h3>
+      <p class="note" style="margin-top:-4px">Untick a kind to keep it in the document. It
+      is still counted in the re-identification risk, so the number you are shown is the
+      risk for the document you would actually send.</p>
       <ul class="tally">${rows}</ul>
+      ${state.keepTypes.length ? `<p class="keep-summary">Keeping
+        ${state.keepTypes.map((t) => `<strong>${esc(t)}</strong>`).join(", ")} in the clear.</p>` : ""}
       ${coref}
       <p class="note">Click any marked phrase to see what each mode does to it.</p>`;
+
     return;
   }
 
@@ -158,7 +187,8 @@ function renderPanel() {
       <p>${left} quasi-identifiers stay in the text — dates, places, ages, demographics.
       Individually none of them names anyone.</p>
       <p class="note">That is also the weakness. Switch to Anonymise to see how many
-      documents in the benchmark corpus share this document's remaining fingerprint.</p>`;
+      documents in the benchmark corpus share this document's remaining fingerprint.</p>
+      ${keepControls(d)}`;
     return;
   }
 
@@ -210,6 +240,7 @@ function renderPanel() {
              <p class="note">The fingerprint is now empty, which trivially satisfies any target —
                so k is not a meaningful score here. The pipeline reports this as a failure to
                converge rather than a success, and this panel follows it.</p>`}
+      ${keepControls(d)}
       ${kPath}
       ${ladder ? `<h3>${m.converged ? "What was broadened" : "How far each one was broadened before it was dropped"}</h3>
                   <ul class="ladder">${ladder}</ul>` : ""}
@@ -262,7 +293,8 @@ function renderPanel() {
       </div>
       <p class="note">This is the point of the mode: the codes go out, the answer comes
       back, and the names are re-attached on this machine.</p>` : ""}
-    ${linkLedger(d.modes[payloadKey("pseudonymise")].links)}`;
+    ${linkLedger(d.modes[payloadKey("pseudonymise")].links)}
+    ${keepControls(d)}`;
 
   $("pro-pseudo")?.addEventListener("change", (ev) => {
     state.proPseudo = ev.target.checked;
@@ -451,6 +483,7 @@ async function run() {
         k_target: state.kTarget,
         max_iterations: state.maxIters,
         coref: $("coref").checked,
+        keep_types: state.keepTypes,
       }),
     });
     if (!res.ok) {
@@ -460,6 +493,7 @@ async function run() {
     state.data = await res.json();
     state.selected = null;
     renderDoc();
+    applyMode();          // stay on the tab the reader was looking at
   } finally {
     state.running = false;
     $("run").disabled = false;
@@ -518,6 +552,18 @@ $("ledger-toggle").addEventListener("click", () => {
 });
 document.addEventListener("keydown", (ev) => {
   if (ev.key === "Escape") { openDrawer(false); if (state.selected) selectEntity(state.selected); }
+});
+
+// Delegated once: the toggles are re-rendered on every panel, and rebinding
+// them each time is how a listener ends up attached four deep.
+document.getElementById("panel").addEventListener("change", (ev) => {
+  const box = ev.target.closest(".keep-box");
+  if (!box) return;
+  const type = box.dataset.type;
+  state.keepTypes = box.checked
+    ? state.keepTypes.filter((t) => t !== type)
+    : [...state.keepTypes, type];
+  run();
 });
 
 (async function start() {

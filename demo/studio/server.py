@@ -304,12 +304,18 @@ class AnalyseRequest(BaseModel):
     k_target: int = 5
     max_iterations: int = 3
     coref: bool = True
+    # Entity types the reader has chosen to keep in the clear. They are still
+    # detected and still counted in the mosaic fingerprint — the risk figure
+    # reflects the document that actually leaves the building.
+    keep_types: List[str] = []
 
 
 class RestoreRequest(BaseModel):
     text: str
     vault: Dict[str, str]
 
+
+_NO_STORE = {"Cache-Control": "no-store, must-revalidate", "Pragma": "no-cache"}
 
 app = FastAPI(title="Anonymiser Studio")
 
@@ -342,7 +348,7 @@ def analyse(req: AnalyseRequest) -> JSONResponse:
     predict = _memoised(_state["predictor"])           # one model pass, four pipelines
     scorer = _scorer()
 
-    common = {"coref_extend": req.coref}
+    common = {"coref_extend": req.coref, "exempt_types": tuple(req.keep_types)}
     redact = LitePipeline(ner_provider=predict, **common)(text)
     pseudo = LitePipeline(ner_provider=predict, pseudonymise=True, **common)(text)
     anonymise = ProPipeline(
@@ -470,10 +476,28 @@ def samples() -> List[dict]:
 
 @app.get("/")
 def index() -> FileResponse:
-    return FileResponse(STATIC / "index.html")
+    return FileResponse(STATIC / "index.html", headers=_NO_STORE)
 
 
-app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
+class _FreshStatic(StaticFiles):
+    """
+    Static files, never cached.
+
+    This is a development tool that is edited while it is running. A browser
+    holding on to yesterday's app.js looks exactly like a broken feature, and
+    costs more than the handful of milliseconds re-fetching a 20 KB file saves.
+    """
+
+    def is_not_modified(self, response_headers, request_headers) -> bool:
+        return False
+
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        response.headers.update(_NO_STORE)
+        return response
+
+
+app.mount("/static", _FreshStatic(directory=str(STATIC)), name="static")
 
 
 def main() -> None:

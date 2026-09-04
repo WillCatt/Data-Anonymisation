@@ -47,7 +47,15 @@ class LitePipeline(Pipeline):
         )
 
         for span in spans:
-            if span.identifier_role == "DIRECT":
+            if span.entity_type in self.exempt_types:
+                audit.append(AuditEntry(
+                    span=span, action="leave",
+                    rationale=(
+                        f"{span.entity_type} kept by request; it stays in the "
+                        f"document exactly as written."
+                    ),
+                ))
+            elif span.identifier_role == "DIRECT":
                 if pseudo is not None:
                     span.replacement = pseudo.token_for(span.entity_type, span.text)
                     rationale = (
