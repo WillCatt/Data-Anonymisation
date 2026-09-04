@@ -261,7 +261,8 @@ function renderPanel() {
         <div class="out" id="restored" hidden></div>
       </div>
       <p class="note">This is the point of the mode: the codes go out, the answer comes
-      back, and the names are re-attached on this machine.</p>` : ""}`;
+      back, and the names are re-attached on this machine.</p>` : ""}
+    ${linkLedger(d.modes[payloadKey("pseudonymise")].links)}`;
 
   $("pro-pseudo")?.addEventListener("change", (ev) => {
     state.proPseudo = ev.target.checked;
@@ -280,6 +281,32 @@ function renderPanel() {
     out.innerHTML = html;
     out.hidden = false;
   });
+}
+
+// Which mentions were folded together, and which were deliberately not. A
+// wrong merge is the expensive error here: two people behind one code means
+// restore() writes one name over both.
+function linkLedger(links) {
+  const rows = Object.values(links || {});
+  const merged = rows.filter((r) => r.merged && r.evidence !== "exact");
+  const refused = rows.filter((r) => !r.merged && r.refusal && r.refusal !== "type_not_linkable");
+  if (!merged.length && !refused.length) return "";
+
+  const line = (r) => r.merged
+    ? `<li><span class="ll-form">${esc(r.matched_form)}</span> and its shorthand share
+         <code>${esc(r.token)}</code> — ${esc(EVIDENCE_PROSE[r.evidence] || r.evidence)},
+         <span class="${confidenceClass(r.confidence)}">${Math.round(r.confidence * 100)}%</span></li>`
+    : `<li class="is-refused">${esc(r.rationale)}</li>`;
+
+  return `
+    <h3>How the codes were decided</h3>
+    <p class="note">Every code is a claim that two mentions are the same entity. The
+    percentage is how often a link made on that evidence is right, measured against
+    44,614 gold-annotated links.</p>
+    <ul class="linkledger">
+      ${merged.map(line).join("")}
+      ${refused.map(line).join("")}
+    </ul>`;
 }
 
 function sampleAnswer(entries) {
@@ -308,6 +335,50 @@ function selectEntity(id) {
   renderPanel();
 }
 
+// A pseudonym is a claim that two mentions are the same entity. Show which
+// claim was made, on what evidence, and what that evidence is measured to be
+// worth — including when the claim was refused.
+const EVIDENCE_PROSE = {
+  exact:                 "the identical phrase had already appeared",
+  exact_casefold:        "the same phrase in different case",
+  honorific_only:        "the same name with the title dropped",
+  initialism:            "its initials",
+  initialism_loose:      "its initials, with a word dropped",
+  initialism_reverse:    "the full name it abbreviates",
+  short_in_long_1tok:    "a shorter form of it",
+  short_in_long_multi:   "a shorter form of it",
+  long_over_short_1tok:  "a longer phrase containing it",
+  long_over_short_multi: "a longer phrase containing it",
+};
+
+function confidenceClass(c) {
+  if (c === null || c === undefined) return "";
+  return c >= 0.8 ? "is-strong" : c >= 0.5 ? "is-fair" : "is-weak";
+}
+
+function linkNote(link) {
+  if (!link) return "";
+  if (link.merged) {
+    const pct = Math.round(link.confidence * 100);
+    return `<div class="link ${confidenceClass(link.confidence)}">
+      <span class="link-tag">same entity as</span>
+      <span class="link-form">${esc(link.matched_form)}</span>
+      <span class="link-why">— matched by ${esc(EVIDENCE_PROSE[link.evidence] || link.evidence)}</span>
+      <span class="link-conf">${pct}% of such links are right</span>
+    </div>`;
+  }
+  const reason = {
+    ambiguous: `${link.tied} entities matched it equally well, so neither was chosen`,
+    below_threshold: "the only match was too weak to act on",
+    type_not_linkable: "shorthand is not resolved for this kind of identifier",
+  }[link.refusal];
+  if (!reason) return "";
+  return `<div class="link is-refused">
+    <span class="link-tag">kept separate</span>
+    <span class="link-why">— ${esc(reason)}</span>
+  </div>`;
+}
+
 function renderInspector() {
   const e = state.data.entities.find((x) => x.id === state.selected);
   if (!e) { state.selected = null; return renderPanel(); }
@@ -327,6 +398,7 @@ function renderInspector() {
       <div class="fate-val">${esc(f.replacement ?? e.text)}</div>
       ${trail}
       <p class="fate-why">${esc(f.rationale)}</p>
+      ${linkNote(f.link)}
     </div>`;
   }).join("");
 

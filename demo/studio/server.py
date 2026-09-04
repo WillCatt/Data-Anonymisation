@@ -253,12 +253,43 @@ def _audit_rows(result: RedactionResult) -> List[dict]:
     return rows
 
 
+def _link_rows(result: RedactionResult) -> Dict[str, dict]:
+    """
+    Pair every pseudonym link decision with the span it resolved.
+
+    The pipelines call `token_for` once per DIRECT span, in span order, so the
+    decisions line up with those spans one for one. That ordering is an
+    assumption, so it is checked rather than trusted: if the surface forms stop
+    matching, return nothing and show nothing, because a link attributed to the
+    wrong phrase is worse than no link at all.
+    """
+    direct = [s for s in result.spans if s.identifier_role == "DIRECT"]
+    if len(direct) != len(result.pseudonym_links):
+        return {}
+    rows: Dict[str, dict] = {}
+    for span, decision in zip(direct, result.pseudonym_links):
+        if decision.surface_form != span.text.strip():
+            return {}
+        rows[f"{span.start}-{span.end}"] = {
+            "token": decision.token,
+            "evidence": decision.evidence,
+            "confidence": decision.confidence,
+            "matched_form": decision.matched_form,
+            "tied": decision.tied_candidates,
+            "refusal": decision.refusal,
+            "rationale": decision.describe(),
+            "merged": decision.merged,
+        }
+    return rows
+
+
 def _mode_payload(text: str, result: RedactionResult) -> dict:
     return {
         "text": result.redacted_text,
         "segments": _segments(text, result),
         "audit": _audit_rows(result),
         "vault": result.pseudonym_vault,
+        "links": _link_rows(result),
         "mosaic": {
             "initial": result.mosaic_risk_initial,
             "final": result.mosaic_risk_final,
@@ -345,6 +376,9 @@ def analyse(req: AnalyseRequest) -> JSONResponse:
                 "rationale": row["rationale"],
                 "iteration": row["iteration"],
                 "steps": [],
+                # Only the pseudonymise modes carry one: it is the record of
+                # which entity this mention was decided to be, and on what.
+                "link": payload["links"].get(row["id"]),
             }
     entities = sorted(by_id.values(), key=lambda e: int(e["id"].split("-")[0]))
 
