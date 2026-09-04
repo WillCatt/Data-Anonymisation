@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anonymiser</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wordmark">
+    <span class="wordmark-bar" aria-hidden="true"></span>
+    <h1>Anonymiser</h1>
+    <p>See what leaves the building.</p>
+  </div>
+  <div class="masthead-right">
+    <div id="detector" class="detector" title="The detector this session is running">
+      <span class="detector-dot" data-state="loading"></span>
+      <span id="detector-text">Starting the detector…</span>
+    </div>
+    <button id="open-doc" class="btn btn-quiet" type="button">Change document</button>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist" aria-label="Treatment">
+  <button class="tab is-active" role="tab" data-mode="source" aria-selected="true">
+    <span class="tab-name">Source</span>
+    <span class="tab-sub">Nothing removed</span>
+  </button>
+  <button class="tab" role="tab" data-mode="redact" aria-selected="false">
+    <span class="tab-name">Redact</span>
+    <span class="tab-sub">Direct identifiers out</span>
+  </button>
+  <button class="tab" role="tab" data-mode="anonymise" aria-selected="false">
+    <span class="tab-name">Anonymise</span>
+    <span class="tab-sub">Quasi-identifiers broadened</span>
+  </button>
+  <button class="tab" role="tab" data-mode="pseudonymise" aria-selected="false">
+    <span class="tab-name">Pseudonymise</span>
+    <span class="tab-sub">Coded, and reversible</span>
+  </button>
+</nav>
+
+<main class="stage">
+  <article class="sheet" id="sheet" aria-live="polite">
+    <div class="sheet-status" id="sheet-status">Reading the document…</div>
+    <div class="doc" id="doc"></div>
+  </article>
+
+  <aside class="side" id="side">
+    <div class="panel" id="panel"></div>
+  </aside>
+</main>
+
+<section class="ledger" id="ledger">
+  <button class="ledger-toggle" id="ledger-toggle" type="button" aria-expanded="false">
+    <span id="ledger-count">Decision record</span>
+  </button>
+  <div class="ledger-body" id="ledger-body" hidden></div>
+</section>
+
+<!-- Document drawer -->
+<div class="drawer-scrim" id="scrim" hidden></div>
+<div class="drawer" id="drawer" hidden aria-label="Choose a document">
+  <div class="drawer-head">
+    <h2>Document</h2>
+    <button class="btn btn-quiet" id="close-doc" type="button">Close</button>
+  </div>
+  <label class="field">
+    <span class="field-label">Start from a sample</span>
+    <select id="samples"></select>
+  </label>
+  <label class="field field-grow">
+    <span class="field-label">Or paste your own</span>
+    <textarea id="input" spellcheck="false" placeholder="Paste a matter note, a judgment, an incident report…"></textarea>
+  </label>
+  <div class="drawer-actions">
+    <label class="check">
+      <input type="checkbox" id="coref" checked>
+      <span>Catch shorthand mentions after the first full name</span>
+    </label>
+    <button class="btn btn-solid" id="run" type="button">Analyse document</button>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

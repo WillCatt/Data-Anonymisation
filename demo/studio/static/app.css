@@ -1,0 +1,375 @@
+/* ------------------------------------------------------------------ *
+ * Anonymiser Studio
+ *
+ * The subject is a document under review, so the interface is built from
+ * that: cool photocopy stock for the ground, a warm sheet for the page,
+ * blue-black ink for the type. Colour is the legend, not decoration —
+ * black is a redaction, ochre is a broadened quasi-identifier, violet is
+ * a pseudonym, oxblood is a re-identification risk. Nothing else is
+ * coloured, so every colour on screen means something.
+ * ------------------------------------------------------------------ */
+:root {
+  color-scheme: light;
+
+  --paper:   #e9eaec;   /* the desk: cool photocopy grey            */
+  --sheet:   #fbfbfa;   /* the page                                  */
+  --ink:     #0e1a2b;   /* blue-black, the way legal print reads     */
+  --ink-soft:#5c6472;
+  --rule:    #cfd3d8;
+
+  --bar:     #000000;   /* a redaction bar is actually black         */
+  --ochre:   #d9b740;   /* highlighter: generalised quasi-identifier */
+  --ochre-deep:#8a6d12;
+  --cipher:  #57508f;   /* pseudonym token                           */
+  --stamp:   #8c2f2a;   /* the re-identification stamp               */
+
+  --serif: Charter, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --sans: ui-sans-serif, -apple-system, "SF Pro Text", "Segoe UI", "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+/* An author `display` beats the UA style for [hidden], and the drawer sets
+   display:flex — so state it once, loudly, rather than per component. */
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------------------------------------------------------------- *
+ * Masthead
+ * ---------------------------------------------------------------- */
+.masthead {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 24px; flex-wrap: wrap;
+  padding: 26px 32px 18px;
+  border-bottom: 1px solid var(--rule);
+}
+.wordmark { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.wordmark-bar {
+  width: 30px; height: 13px; background: var(--bar);
+  transform: translateY(-1px);
+}
+.wordmark h1 {
+  font-family: var(--serif);
+  font-size: 25px; font-weight: 600; letter-spacing: -0.01em;
+  margin: 0;
+}
+.wordmark p { margin: 0; color: var(--ink-soft); font-size: 14px; }
+
+.masthead-right { display: flex; align-items: center; gap: 14px; }
+
+.detector {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 11px;
+  background: var(--sheet); border: 1px solid var(--rule);
+  font-size: 12.5px; color: var(--ink-soft);
+}
+.detector-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-soft); flex: none; }
+.detector-dot[data-state="real"]     { background: #2f7d4f; }
+.detector-dot[data-state="fallback"] { background: var(--stamp); }
+.detector strong { color: var(--ink); font-weight: 600; }
+
+/* ---------------------------------------------------------------- *
+ * Buttons and fields
+ * ---------------------------------------------------------------- */
+.btn {
+  font: inherit; font-size: 13px;
+  padding: 7px 14px; border: 1px solid var(--ink);
+  background: transparent; color: var(--ink);
+  cursor: pointer;
+}
+.btn:hover { background: var(--ink); color: var(--sheet); }
+.btn-solid { background: var(--ink); color: var(--sheet); }
+.btn-solid:hover { background: #000; }
+.btn-quiet { border-color: var(--rule); color: var(--ink-soft); }
+.btn-quiet:hover { border-color: var(--ink); background: transparent; color: var(--ink); }
+.btn:disabled { opacity: .45; cursor: progress; }
+:focus-visible { outline: 2px solid var(--cipher); outline-offset: 2px; }
+
+/* ---------------------------------------------------------------- *
+ * Tabs — the four treatments of one document
+ * ---------------------------------------------------------------- */
+.tabs {
+  display: flex; gap: 0; padding: 0 32px;
+  border-bottom: 1px solid var(--rule); background: var(--paper);
+  overflow-x: auto;
+}
+.tab {
+  appearance: none; background: none; border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 13px 22px 11px 0; margin-right: 26px;
+  text-align: left; cursor: pointer; color: var(--ink-soft);
+  font: inherit; white-space: nowrap;
+}
+.tab-name { display: block; font-size: 15px; font-weight: 600; color: var(--ink); }
+.tab-sub  { display: block; font-size: 12px; margin-top: 1px; }
+.tab.is-active { border-bottom-color: var(--ink); }
+.tab.is-active .tab-sub { color: var(--ink); }
+.tab:not(.is-active) .tab-name { font-weight: 500; color: var(--ink-soft); }
+
+/* ---------------------------------------------------------------- *
+ * Stage: the page, and the column that explains it
+ * ---------------------------------------------------------------- */
+.stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 28px;
+  align-items: start;
+  padding: 28px 32px 40px;
+  max-width: 1500px;
+}
+
+.sheet {
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  box-shadow: 0 1px 0 rgba(14,26,43,.05), 0 10px 26px -18px rgba(14,26,43,.5);
+  padding: 44px 52px 52px;
+  min-height: 46vh;
+  position: relative;
+}
+.sheet-status {
+  font-size: 12.5px; color: var(--ink-soft);
+  padding-bottom: 14px; margin-bottom: 22px;
+  border-bottom: 1px solid var(--rule);
+}
+.doc {
+  font-family: var(--serif);
+  font-size: 17px; line-height: 1.66;
+  white-space: pre-wrap;
+  max-width: 68ch;
+  color: var(--ink);
+}
+
+/* ---------------------------------------------------------------- *
+ * Entities in the page. One element per entity, contents swapped on
+ * mode change, so the treatment visibly happens to the same words.
+ * ---------------------------------------------------------------- */
+.ent {
+  cursor: pointer;
+  border-radius: 1px;
+  transition: background-color .28s ease, color .28s ease, box-shadow .18s ease;
+  padding: 0 1px;
+}
+.ent:hover { box-shadow: 0 0 0 2px rgba(87,80,143,.28); }
+.ent.is-selected { box-shadow: 0 0 0 2px var(--cipher); }
+
+/* Source view: role is the thing that matters, so mark by role. */
+.ent[data-view="source"][data-role="DIRECT"] {
+  background: rgba(14,26,43,.10);
+  box-shadow: inset 0 -2px 0 rgba(14,26,43,.55);
+}
+.ent[data-view="source"][data-role="QUASI"] {
+  background: rgba(217,183,64,.26);
+  box-shadow: inset 0 -2px 0 rgba(217,183,64,.9);
+}
+.ent[data-view="source"][data-source="coref"] {
+  box-shadow: inset 0 -2px 0 var(--cipher);
+}
+
+/* Treated views: what happened to it is the thing that matters. */
+.ent[data-act="redacted"] {
+  background: var(--bar); color: var(--sheet);
+  font-family: var(--sans); font-size: 13.5px; letter-spacing: .01em;
+  padding: 1px 5px;
+}
+.ent[data-act="pseudonym"] {
+  background: rgba(87,80,143,.13); color: var(--cipher);
+  font-family: var(--mono); font-size: 13.5px;
+  padding: 1px 4px;
+  box-shadow: inset 0 -2px 0 rgba(87,80,143,.55);
+}
+.ent[data-act="generalised"] {
+  background: rgba(217,183,64,.34); color: var(--ochre-deep);
+  box-shadow: inset 0 -2px 0 var(--ochre);
+  font-weight: 600;
+}
+.ent[data-act="kept"] { background: none; box-shadow: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ent { transition: none; }
+}
+
+/* ---------------------------------------------------------------- *
+ * Side column
+ * ---------------------------------------------------------------- */
+.side { position: sticky; top: 20px; }
+.panel {
+  background: var(--sheet); border: 1px solid var(--rule);
+  padding: 20px 20px 22px;
+}
+.panel h2 {
+  font-family: var(--serif); font-size: 17px; font-weight: 600;
+  margin: 0 0 3px;
+}
+.panel h3 {
+  font-size: 12.5px; font-weight: 600; color: var(--ink-soft);
+  margin: 20px 0 8px;
+}
+.panel p { margin: 0 0 12px; color: var(--ink-soft); font-size: 13px; }
+.panel p.lede { color: var(--ink); }
+
+.tally { list-style: none; margin: 0; padding: 0; }
+.tally li {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 6px 0; border-bottom: 1px solid var(--rule);
+  font-size: 13px;
+}
+.tally li:last-child { border-bottom: 0; }
+.tally .swatch { width: 10px; height: 10px; flex: none; }
+.tally .n { margin-left: auto; font-family: var(--mono); font-size: 12.5px; }
+.tally .role { color: var(--ink-soft); font-size: 11.5px; }
+
+.swatch-direct { background: rgba(14,26,43,.55); }
+.swatch-quasi  { background: var(--ochre); }
+.swatch-coref  { background: var(--cipher); }
+
+/* The stamp — the one loud object in the interface. It is the finding. */
+.stamp {
+  display: inline-block;
+  margin: 6px 0 14px;
+  padding: 9px 16px 8px;
+  border: 3px double var(--stamp);
+  color: var(--stamp);
+  font-family: var(--sans);
+  font-weight: 700; font-size: 15px; letter-spacing: .08em;
+  text-transform: uppercase;
+  transform: rotate(-3.5deg);
+  opacity: .92;
+}
+.stamp[data-safe="true"] { --stamp: #2f6d4a; border-style: solid; }
+.stamp small { display: block; letter-spacing: .04em; font-size: 10.5px; font-weight: 600; opacity: .8; }
+
+.ladder { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+.ladder li { padding: 7px 0; border-bottom: 1px solid var(--rule); }
+.ladder li:last-child { border-bottom: 0; }
+.ladder .from { color: var(--ink-soft); text-decoration: line-through; text-decoration-thickness: 1px; }
+.ladder .mid { color: var(--ochre-deep); }
+.ladder .to { color: var(--ochre-deep); font-weight: 600; }
+.kpath {
+  font-family: var(--mono); font-size: 14px; color: var(--ink) !important;
+  background: rgba(140,47,42,.07); border-left: 2px solid var(--stamp);
+  padding: 7px 10px; margin: 0 0 10px !important;
+}
+
+.vault { width: 100%; border-collapse: collapse; font-size: 13px; }
+.vault th {
+  text-align: left; font-size: 11.5px; color: var(--ink-soft);
+  font-weight: 600; padding-bottom: 6px; border-bottom: 1px solid var(--rule);
+}
+.vault td { padding: 6px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.vault code { font-family: var(--mono); font-size: 12.5px; color: var(--cipher); }
+
+.roundtrip textarea {
+  width: 100%; min-height: 74px; resize: vertical;
+  font-family: var(--serif); font-size: 14px; line-height: 1.5;
+  padding: 9px 10px; border: 1px solid var(--rule); background: #fff; color: var(--ink);
+}
+.roundtrip .out {
+  margin-top: 10px; padding: 10px;
+  background: rgba(87,80,143,.07);
+  border-left: 2px solid var(--cipher);
+  font-family: var(--serif); font-size: 14px; line-height: 1.55;
+}
+.roundtrip .out mark { background: rgba(87,80,143,.2); color: var(--ink); }
+
+.inspector-back {
+  appearance: none; background: none; border: 0; padding: 0 0 12px;
+  color: var(--ink-soft); font: inherit; font-size: 12.5px; cursor: pointer;
+}
+.inspector-back:hover { color: var(--ink); }
+.fate { border-top: 1px solid var(--rule); padding: 11px 0; }
+.fate:last-child { padding-bottom: 0; }
+.fate-head { display: flex; align-items: baseline; gap: 8px; }
+.fate-mode { font-weight: 600; font-size: 13px; }
+.fate-act { font-size: 11.5px; color: var(--ink-soft); margin-left: auto; }
+.fate-val { font-family: var(--mono); font-size: 12.5px; margin: 5px 0 4px; word-break: break-word; }
+.fate-why { font-size: 12px; color: var(--ink-soft); margin: 0; }
+
+.note {
+  font-size: 12px; color: var(--ink-soft);
+  border-left: 2px solid var(--rule); padding: 2px 0 2px 11px; margin: 14px 0 0;
+}
+
+.control { display: block; margin: 0 0 12px; font-size: 13px; }
+.control span { display: block; margin-bottom: 5px; color: var(--ink-soft); }
+.control input[type="range"] { width: 100%; accent-color: var(--ink); }
+.control .val { font-family: var(--mono); color: var(--ink); }
+
+/* ---------------------------------------------------------------- *
+ * Decision record
+ * ---------------------------------------------------------------- */
+.ledger { border-top: 1px solid var(--rule); background: var(--sheet); }
+.ledger-toggle {
+  width: 100%; text-align: left; padding: 14px 32px;
+  background: none; border: 0; font: inherit; font-size: 13px;
+  color: var(--ink); cursor: pointer;
+}
+.ledger-toggle:hover { background: rgba(14,26,43,.03); }
+.ledger-toggle::before { content: "+ "; color: var(--ink-soft); }
+.ledger-toggle[aria-expanded="true"]::before { content: "− "; }
+.ledger-body { padding: 0 32px 30px; overflow-x: auto; }
+.record { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.record th {
+  text-align: left; font-weight: 600; color: var(--ink-soft);
+  padding: 8px 12px 8px 0; border-bottom: 1px solid var(--rule); white-space: nowrap;
+}
+.record td { padding: 7px 12px 7px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.record .why { color: var(--ink-soft); }
+.record code { font-family: var(--mono); font-size: 12px; }
+
+/* ---------------------------------------------------------------- *
+ * Document drawer
+ * ---------------------------------------------------------------- */
+.drawer-scrim {
+  position: fixed; inset: 0; background: rgba(14,26,43,.34); z-index: 20;
+}
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(520px, 100%);
+  background: var(--sheet); border-left: 1px solid var(--rule);
+  box-shadow: -18px 0 40px -30px rgba(14,26,43,.7);
+  z-index: 21; padding: 24px 26px 26px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.drawer-head { display: flex; align-items: baseline; justify-content: space-between; }
+.drawer-head h2 { font-family: var(--serif); font-size: 20px; margin: 0; font-weight: 600; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-grow { flex: 1; min-height: 0; }
+.field-label { font-size: 12.5px; color: var(--ink-soft); }
+.field select, .field textarea {
+  font: inherit; padding: 8px 10px; border: 1px solid var(--rule);
+  background: #fff; color: var(--ink); width: 100%;
+}
+.field textarea {
+  flex: 1; min-height: 220px; resize: none;
+  font-family: var(--serif); font-size: 15px; line-height: 1.55;
+}
+.drawer-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.check { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; color: var(--ink-soft); max-width: 300px; }
+.check input { margin-top: 2px; accent-color: var(--ink); }
+
+/* ---------------------------------------------------------------- *
+ * Narrow screens
+ * ---------------------------------------------------------------- */
+@media (max-width: 1080px) {
+  .stage { grid-template-columns: minmax(0, 1fr); }
+  .side { position: static; }
+  .sheet { padding: 30px 26px 36px; }
+  .masthead, .tabs, .ledger-toggle, .ledger-body { padding-left: 20px; padding-right: 20px; }
+  .stage { padding-left: 20px; padding-right: 20px; }
+}
+
+/* The iterate-until-safe loop, shown as the path it actually took. */
+.trail {
+  font-family: var(--mono); font-size: 11.5px; color: var(--ochre-deep);
+  background: rgba(217,183,64,.14); padding: 5px 7px; margin: 0 0 6px;
+  word-break: break-word;
+}
