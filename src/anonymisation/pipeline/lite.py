@@ -84,4 +84,5 @@ class LitePipeline(Pipeline):
             iterations_used=0,
             converged=True,
             pseudonym_vault=(pseudo.vault if pseudo is not None else {}),
+            pseudonym_links=(pseudo.decisions if pseudo is not None else []),
         )

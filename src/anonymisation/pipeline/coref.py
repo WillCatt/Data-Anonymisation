@@ -33,6 +33,13 @@ can't help with. It is kept as a zero-cost defensive layer — every span it
 adds is logged with source="coref" and confidence=0.7 — not as a source of
 headline gains. See scripts/evaluate_mention_recall.py for the
 evaluation that produced the null.
+
+Note that 0.7 is a hand-picked number and remains one. This module answers
+"is this a mention?"; the *other* coreference decision — "is this the same
+mention?", made by Pseudonymiser when it assigns tokens — was measured
+against TAB's gold entity_id clusters in notebook 17 and now carries a
+calibrated confidence per rule. The same treatment would suit this layer and
+has not been done.
 """
 from __future__ import annotations
 

@@ -57,7 +57,7 @@ Flat redaction is *more private and less useful*. The vault is what makes the te
 ### 5 · Evaluation, and three things that didn't work
 See [What didn't work](#what-didnt-work). All three are kept deliberately — the honest null is the finding.
 
-→ [`12_null_coreference`](notebooks/12_null_coreference.ipynb) · [`13_finetune_legalbert`](notebooks/13_finetune_legalbert.ipynb) · [`14_null_ensemble`](notebooks/14_null_ensemble.ipynb) · [`15_final_head_to_head`](notebooks/15_final_head_to_head.ipynb)
+→ [`12_null_coreference`](notebooks/12_null_coreference.ipynb) · [`13_finetune_legalbert`](notebooks/13_finetune_legalbert.ipynb) · [`14_null_ensemble`](notebooks/14_null_ensemble.ipynb) · [`15_final_head_to_head`](notebooks/15_final_head_to_head.ipynb) · [`17_coreference_and_referential_confidence`](notebooks/17_coreference_and_referential_confidence.ipynb)
 
 ### 6 · Where it goes next
 The two controls this project arrived at — a minimum group size before anything is reportable, and generalising indirect details until a combination stops being unique — are k-anonymity and the mosaic effect. Employee-survey platforms already ship them as product settings. Free-text comments are where they're hardest to enforce, and exactly the text people now want to run through an LLM. See [Limits and next](#limits-and-next).
@@ -226,6 +226,52 @@ Reproduce: `python scripts/ablate_inference_config.py` · `python scripts/ablate
 
 ---
 
+## The link the pseudonymiser has to get right
+
+Detection asks *is this a name?* Pseudonymisation asks a second question —
+*is this the **same** name?* — and that one decides whether two mentions share
+a token. It had never been measured.
+
+The errors are asymmetric in a way no detection metric can see. A missed link
+splits one person across `[PERSON_A]` and `[PERSON_B]`: nothing leaks, an LLM
+just loses the thread. A false link gives two people one token, so `restore()`
+writes **one real name over both** — the wrong person's name in a sentence
+about someone else, in a document the firm believes it has cleaned.
+
+TAB's gold `entity_id` makes this measurable: feed the *gold* mentions in and
+the linking decision is isolated from the detection decision. No model, 30
+seconds. Scored against those clusters, the shipped linker was over-merging
+three false pairs for every one it missed.
+
+| | pairwise precision | recall | F1 |
+|---|---|---|---|
+| One substring rule for every type | 0.791 | 0.918 | 0.850 [0.821, 0.874] |
+| Calibrated per rule and entity type | **0.957** | 0.857 | 0.904 [0.882, 0.922] |
+
+False pairs fall from 4,539 to 727. But the per-type split is the finding, not
+the headline: **PERSON barely moves (0.854 → 0.863)** while DATETIME, CODE,
+LOC, DEM, MISC and QUANTITY all go to 1.000. The rule was never broken at the
+job it was written for — introduce a party in full, then use the surname. It
+was being applied to all eight entity types, including the ones where two
+mentions sharing a token are emphatically not the same thing. `1989` and
+`June 1989` are not the same date.
+
+Each rule now carries its measured precision — an exact repeat of a surface
+form is the same entity 35,183 times out of 35,183; reverse containment is
+right 5% of the time — and a merge needs 0.50 to go through. That is
+deliberately **not** the F1-optimal threshold, which is 0.30: the extra point
+of F1 is bought with exactly the errors that put a wrong name in front of a
+client. A merge where two entities match equally well (`Mr Ravnsborg` after
+two different Ravnsborgs) is refused outright — those are right 23–46% of the
+time against 97% otherwise, a distinction worth 0.0003 of F1 and rather more
+than that in a legal document.
+
+Walkthrough: [`notebooks/17_coreference_and_referential_confidence.ipynb`](notebooks/17_coreference_and_referential_confidence.ipynb) — runs in seconds, loads no models.
+
+Reproduce: `python scripts/evaluate_coref_links.py --profile` · `--fit` · (no flag for the held-out evaluation)
+
+---
+
 ## Repo layout
 
 ```
@@ -243,12 +289,12 @@ Reproduce: `python scripts/ablate_inference_config.py` · `python scripts/ablate
 │   ├── mosaic.py             the re-identification analysis
 │   ├── evaluation.py         span P/R/F1, partial + exact
 │   └── cli.py                `anonymise redact` / `anonymise restore`
-├── notebooks/                01–16, in narrative order (see above)
+├── notebooks/                01–17, in narrative order (see above)
 ├── scripts/                  runnable analysis + figure builders
 ├── results/                  every metric CSV/JSON, one place
 ├── figures/                  generated charts and diagrams
 ├── models/                   fine-tuned checkpoints (gitignored, ~8.8 GB)
-├── tests/                    52 pure-logic tests — no models, no network
+├── tests/                    77 pure-logic tests — no models, no network
 ├── demo/                     Gradio app, worked example, static showcase
 ├── spaces/                   HuggingFace Spaces deployment bundle
 └── docs/                     writeup + per-stage process notes
@@ -299,6 +345,7 @@ anonymise redact --variant pro --pseudonymise --vault-out vault.json doc.txt
 | The detection ladder | `notebooks/02` → `06` in order |
 | The re-identification finding | `notebooks/07_reidentification_mosaic.ipynb` |
 | Coreference mention-recall | `python scripts/evaluate_mention_recall.py --sample 50` |
+| Pseudonym link precision | `python scripts/evaluate_coref_links.py` |
 | Cached predictions for combiner work | `python scripts/cache_predictions.py` |
 | The combiner sweep | `python scripts/eval_combiners.py` |
 | All figures | `python scripts/build_performance_summary.py` (and the other `build_*.py`) |

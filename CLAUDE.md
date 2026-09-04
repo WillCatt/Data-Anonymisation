@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A portfolio research project on PII redaction for legal text, anchored in the **Text Anonymization Benchmark (TAB)**. It is organised **by function, not chronology** — one reusable package (`src/anonymisation/`) with `notebooks/` (01–15, in narrative order), `scripts/`, `results/`, `models/`, `figures/`, `docs/` beside it. The thesis it argues empirically: off-the-shelf NER is *not* sufficient to anonymise legal documents, and even perfect NER leaves a residual re-identification ("mosaic") risk. Three results are deliberately kept as **measured negative results** — the `12_null_coreference` and `14_null_ensemble` notebooks and the LegalBERT tie in `13_finetune_legalbert`. Do not "fix" them or delete them; the honest null is the finding. Files prefixed `null_` in `notebooks/` and `results/` are load-bearing.
+A portfolio research project on PII redaction for legal text, anchored in the **Text Anonymization Benchmark (TAB)**. It is organised **by function, not chronology** — one reusable package (`src/anonymisation/`) with `notebooks/` (01–17, in narrative order), `scripts/`, `results/`, `models/`, `figures/`, `docs/` beside it. The thesis it argues empirically: off-the-shelf NER is *not* sufficient to anonymise legal documents, and even perfect NER leaves a residual re-identification ("mosaic") risk. Three results are deliberately kept as **measured negative results** — the `12_null_coreference` and `14_null_ensemble` notebooks and the LegalBERT tie in `13_finetune_legalbert`. Do not "fix" them or delete them; the honest null is the finding. Files prefixed `null_` in `notebooks/` and `results/` are load-bearing.
 
 Note the British spelling **"Anonymisation"** throughout (directory, package name `anonymisation`, module names). Match it.
 
@@ -43,6 +43,7 @@ For an end-to-end sanity check of the actual product (not just metrics), `demo/w
 End-to-end / metric validation is still manual:
 - Re-run the relevant notebooks and check the reported metrics.
 - The standalone evaluation script `scripts/evaluate_mention_recall.py` (run with `--sample N` for a fast subset; full TAB test split is 555 docs, ~8 min on `en_core_web_trf`).
+- `scripts/evaluate_coref_links.py` scores the pseudonymiser's linking against TAB's gold `entity_id` clusters (`--profile` interrogates the annotation, `--fit` refits `LINK_CONFIDENCE`). No models, ~30 s.
 - Every metric CSV/JSON lands in the single top-level `results/` directory.
 
 When changing pipeline logic, run `pytest` and re-run the relevant walkthrough notebook to confirm the headline metric hasn't silently regressed.
@@ -66,10 +67,12 @@ This is the seam the whole package is built on. `src/anonymisation/predictors.py
 Replacements are applied in **reverse offset order** so earlier character offsets stay valid (`apply_replacements`).
 
 ### Pseudonymisation & round-trip
-With `pseudonymise=True`, redacted entities become stable referential tokens (`[PERSON_A]`, `[PERSON_B]`, …) instead of flat `[TYPE]` tags, and a **pseudonym vault** (token → original surface form) is returned on the result. The intended workflow: redact locally → send pseudonymised text to an external LLM → `restore()` the LLM's answer locally using the vault, so real names never leave the firm. CLI: `redact --pseudonymise --vault-out vault.json`, then `restore --vault vault.json`.
+With `pseudonymise=True`, redacted entities become stable referential tokens (`[PERSON_A]`, `[PERSON_B]`, …) instead of flat `[TYPE]` tags, and a **pseudonym vault** (token → original surface form) is returned on the result.
+
+Deciding *which* mentions share a token is a measured decision, not a heuristic (notebook 17). `classify_link_evidence` names the rule that fired — exact repeat, honorific-stripped equality, containment in either direction — and `LINK_CONFIDENCE` holds that rule's precision per entity type, fitted by `scripts/evaluate_coref_links.py` on TAB train+validation. `Pseudonymiser` merges only above `min_link_confidence` (0.5) and refuses a merge when two entities match equally well; every resolution is recorded as a `LinkDecision` on `result.pseudonym_links`. `link_policy="legacy"` reproduces the old first-match-wins behaviour for comparison. **Do not raise the threshold to maximise pairwise F1** — F1 peaks at 0.30 and the default is deliberately 0.50, because a false merge makes `restore()` write the wrong person's name into the output while a missed merge only costs context. The intended workflow: redact locally → send pseudonymised text to an external LLM → `restore()` the LLM's answer locally using the vault, so real names never leave the firm. CLI: `redact --pseudonymise --vault-out vault.json`, then `restore --vault vault.json`.
 
 ### Data model (`pipeline/types.py`)
-`Span` (offset + entity_type + identifier_role + source + generalization_level + replacement), `AuditEntry` (every redact/generalize/leave decision + rationale, exposed for compliance review), and `RedactionResult` (redacted_text, spans, audit, mosaic risk before/after, pseudonym_vault, `to_dict()` for JSON). The **audit log is a first-class output**, not debug logging — preserve it through any refactor.
+`Span` (offset + entity_type + identifier_role + source + generalization_level + replacement), `AuditEntry` (every redact/generalize/leave decision + rationale, exposed for compliance review), and `RedactionResult` (redacted_text, spans, audit, mosaic risk before/after, pseudonym_vault, pseudonym_links, `to_dict()` for JSON). The **audit log is a first-class output**, not debug logging — preserve it through any refactor.
 
 ### Other key modules
 - `mosaic.py` — k-anonymity over QUASI fingerprints; the "1,268/1,268 docs uniquely identifiable" finding.

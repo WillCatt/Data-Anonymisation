@@ -66,6 +66,12 @@ class RedactionResult:
     # Suitable for JSON serialisation; pair with `restore()` to round-trip.
     pseudonym_vault: dict = field(default_factory=dict)
 
+    # One `LinkDecision` per pseudonymised mention: which entity it was
+    # resolved to, on what evidence, and how much that evidence is worth. A
+    # merge is a claim about identity, so it belongs in the audit trail
+    # alongside the redaction decisions rather than only in the vault.
+    pseudonym_links: List = field(default_factory=list)
+
     # Convenience for serialisation
     def to_dict(self) -> dict:
         return {
@@ -95,4 +101,14 @@ class RedactionResult:
             "iterations_used": self.iterations_used,
             "converged": self.converged,
             "pseudonym_vault": self.pseudonym_vault,
+            "pseudonym_links": [
+                {
+                    "surface_form": d.surface_form, "token": d.token,
+                    "entity_type": d.entity_type, "evidence": d.evidence,
+                    "confidence": d.confidence, "matched_form": d.matched_form,
+                    "tied_candidates": d.tied_candidates, "refusal": d.refusal,
+                    "rationale": d.describe(),
+                }
+                for d in self.pseudonym_links
+            ],
         }

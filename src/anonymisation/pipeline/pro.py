@@ -100,6 +100,7 @@ class ProPipeline(Pipeline):
                 mosaic_risk_initial=initial_k, mosaic_risk_final=initial_k,
                 iterations_used=0, converged=True,
                 pseudonym_vault=(pseudo.vault if pseudo is not None else {}),
+                pseudonym_links=(pseudo.decisions if pseudo is not None else []),
             )
 
         # Phase C — iterate-until-safe
@@ -169,6 +170,7 @@ class ProPipeline(Pipeline):
             mosaic_risk_initial=initial_k, mosaic_risk_final=current_k,
             iterations_used=iterations_used, converged=converged,
             pseudonym_vault=(pseudo.vault if pseudo is not None else {}),
+            pseudonym_links=(pseudo.decisions if pseudo is not None else []),
         )
 
     # ------------------------------------------------------------------ #

@@ -1,0 +1,264 @@
+{
+  "split": "test",
+  "unique_documents": 127,
+  "annotator_rows": 555,
+  "same_string_repeats": {
+    "CODE": {
+      "n": 26,
+      "given_one_entity_id": 26
+    },
+    "DATETIME": {
+      "n": 439,
+      "given_one_entity_id": 439
+    },
+    "DEM": {
+      "n": 253,
+      "given_one_entity_id": 253
+    },
+    "LOC": {
+      "n": 386,
+      "given_one_entity_id": 386
+    },
+    "MISC": {
+      "n": 270,
+      "given_one_entity_id": 270
+    },
+    "ORG": {
+      "n": 1045,
+      "given_one_entity_id": 1045
+    },
+    "PERSON": {
+      "n": 401,
+      "given_one_entity_id": 401
+    },
+    "QUANTITY": {
+      "n": 36,
+      "given_one_entity_id": 36
+    }
+  },
+  "cross_form_clusters": {
+    "ORG": 577,
+    "PERSON": 309,
+    "MISC": 140,
+    "DEM": 20,
+    "LOC": 12,
+    "QUANTITY": 2,
+    "DATETIME": 1
+  },
+  "cluster_size_distribution": {
+    "1": 20156,
+    "2": 1992,
+    "3": 569,
+    "4": 282,
+    "5": 147,
+    "6": 79,
+    "7": 88,
+    "8": 57,
+    "9": 28,
+    "10": 37,
+    "11": 16,
+    "12": 8,
+    "13": 3,
+    "14": 6,
+    "15": 6,
+    "16": 1,
+    "17": 2,
+    "19": 1,
+    "20": 1,
+    "22": 3,
+    "23": 1
+  },
+  "cross_form_examples": {
+    "ORG": [
+      [
+        "Erzincan Martial Law Court (s\u0131k\u0131y\u00f6netim askeri mahkemesi)",
+        "Erzincan Martial Law Court"
+      ],
+      [
+        "United Kingdom of Great Britain and Northern Ireland",
+        "United Kingdom Government"
+      ],
+      [
+        "United Kingdom of Great Britain and Northern Ireland",
+        "United Kingdom"
+      ],
+      [
+        "United Kingdom of Great Britain and Northern Ireland",
+        "United Kingdom Government"
+      ],
+      [
+        "United Kingdom of Great Britain and Northern Ireland",
+        "United Kingdom Government"
+      ],
+      [
+        "Republic of Turkey",
+        "Turkish Government"
+      ],
+      [
+        "Tax Authority (skattemyndigheten)",
+        "Tax Authority"
+      ],
+      [
+        "County Administrative Court (l\u00e4nsr\u00e4tten)",
+        "County Administrative Court"
+      ]
+    ],
+    "PERSON": [
+      [
+        "John Harding Price",
+        "Dr Price"
+      ],
+      [
+        "Mary Hazel Lowe",
+        "Mrs Lowe"
+      ],
+      [
+        "John Harding Price",
+        "Dr Price"
+      ],
+      [
+        "John Harding Price",
+        "Dr Price"
+      ],
+      [
+        "Mary Hazel Lowe",
+        "Mrs Lowe"
+      ],
+      [
+        "John Harding Price",
+        "Dr Price"
+      ],
+      [
+        "Mary Hazel Lowe",
+        "Mrs Lowe"
+      ],
+      [
+        "John Harding Price",
+        "Dr Price"
+      ]
+    ],
+    "DATETIME": [
+      [
+        "early morning of 29 October 1995",
+        "early hours of 29 October 1995"
+      ]
+    ],
+    "LOC": [
+      [
+        "south-east of Turkey",
+        "Ceylanp\u0131nar"
+      ],
+      [
+        "G\u00e4vle, Sweden",
+        "G\u00e4vle"
+      ],
+      [
+        "archipelago of \u00c5land",
+        "\u00c5land"
+      ],
+      [
+        "gemensamma distriktet",
+        "Common District"
+      ],
+      [
+        "District of Famagusta",
+        "Famagusta"
+      ],
+      [
+        "foyer of the cookhouse at the barracks",
+        "foyer of the cookhouse",
+        "cookhouse"
+      ],
+      [
+        "Adare village, Co. Limerick.",
+        "Adare, Co. Limerick",
+        "Adare"
+      ],
+      [
+        "Adare village, Co. Limerick",
+        "Adare"
+      ]
+    ],
+    "DEM": [
+      [
+        "Secretary of State for the Home Office",
+        "Secretary of State"
+      ],
+      [
+        "Charcot-Marie-Tooth disease",
+        "Charcot-Marie-Tooth0"
+      ],
+      [
+        "Charcot-Marie-Tooth disease",
+        "Charcot-Marie-Tooth0"
+      ],
+      [
+        "65 years of age",
+        "age of 65",
+        "65"
+      ],
+      [
+        "65 years of age",
+        "65"
+      ],
+      [
+        "Counsel for the Crown",
+        "Crown"
+      ],
+      [
+        "Parliamentary Ombudsman (justitieombudsmannen)",
+        "Ombudsman"
+      ],
+      [
+        "Secretary of State for Northern Ireland",
+        "Secretary of State"
+      ]
+    ],
+    "MISC": [
+      [
+        "Article 5 of Law no. 3713",
+        "anti-terrorist law"
+      ],
+      [
+        "Common District (gemensamma distriktet)",
+        "Common District"
+      ],
+      [
+        "artificial insemination",
+        "AI"
+      ],
+      [
+        "R (Mellor) v Secretary of State for the Home Department ([2001] 3 WLR 533)",
+        "case of Mellor",
+        "Mellor case",
+        "Mellor"
+      ],
+      [
+        "gaming machines",
+        "machines"
+      ],
+      [
+        "Criminal Justice Act 1988",
+        "1988 Act"
+      ],
+      [
+        "Air Force Act 1955",
+        "the 1955 Act"
+      ],
+      [
+        "Criminal Justice Act 1988",
+        "1988 Act"
+      ]
+    ],
+    "QUANTITY": [
+      [
+        "approximately EUR 514",
+        "PLN 2,000"
+      ],
+      [
+        "385 pounds sterling (GBP)",
+        "GBP 385"
+      ]
+    ]
+  }
+}
