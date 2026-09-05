@@ -66,6 +66,7 @@ Thumbs.db
 # --- Interview prep (local only) ---
 INTERVIEW_PLAN.md
 INTERVIEW_STORIES.md
+INTERVIEW_STORYLINE.md
 # Names two real people (the interview panel) in a fabricated document. Fine
 # as a local demo, not something to publish under their names.
 demo/examples/sample_long_confidentiality_review.txt
