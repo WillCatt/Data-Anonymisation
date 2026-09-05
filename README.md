@@ -4,8 +4,8 @@
 > An empirical answer: measure the detector, then measure what's *still* identifying after the detector is perfect.
 
 [![tests](https://github.com/WillCatt/Data-Anonymisation/actions/workflows/tests.yml/badge.svg)](https://github.com/WillCatt/Data-Anonymisation/actions/workflows/tests.yml)
-[![Best F1](https://img.shields.io/badge/detection-0.851_F1_(RoBERTa_FT)-27ae60?style=flat-square)](figures/phase_overall_f1.png)
-[![Mosaic](https://img.shields.io/badge/re--identification-1,268_/_1,268_unique-d73a49?style=flat-square)](figures/mosaic_reidentification.png)
+[![Best F1](https://img.shields.io/badge/detection-0.856_F1_(RoBERTa_FT)-27ae60?style=flat-square)](figures/phase_overall_f1.png)
+[![Mosaic](https://img.shields.io/badge/re--identification-one_fact_singles_out_77%25-d73a49?style=flat-square)](figures/mosaic_reidentification.png)
 [![Demo](https://img.shields.io/badge/demo-Gradio_+_HF_Spaces-3498db?style=flat-square)](https://willxo-legal-text-anonymisation.hf.space)
 
 Anchored in the [Text Anonymization Benchmark](https://github.com/NorskRegnesentral/text-anonymization-benchmark) (TAB) — 1,268 European Court of Human Rights judgments annotated with entity type **and** identifier role (`DIRECT` / `QUASI` / `NO_MASK`). That second axis is what makes the re-identification question answerable at all, and it is why this corpus and not a general NER one.
