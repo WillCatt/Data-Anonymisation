@@ -5,7 +5,7 @@
 
 [![tests](https://github.com/WillCatt/Data-Anonymisation/actions/workflows/tests.yml/badge.svg)](https://github.com/WillCatt/Data-Anonymisation/actions/workflows/tests.yml)
 [![Best F1](https://img.shields.io/badge/detection-0.856_F1_(RoBERTa_FT)-27ae60?style=flat-square)](figures/phase_overall_f1.png)
-[![Mosaic](https://img.shields.io/badge/re--identification-one_fact_singles_out_77%25-d73a49?style=flat-square)](figures/mosaic_reidentification.png)
+[![Mosaic](https://img.shields.io/badge/re--identification-one_fact_singles_out_81%25-d73a49?style=flat-square)](figures/mosaic_reidentification.png)
 [![Demo](https://img.shields.io/badge/demo-Gradio_+_HF_Spaces-3498db?style=flat-square)](https://willxo-legal-text-anonymisation.hf.space)
 
 Anchored in the [Text Anonymization Benchmark](https://github.com/NorskRegnesentral/text-anonymization-benchmark) (TAB) — 1,268 European Court of Human Rights judgments annotated with entity type **and** identifier role (`DIRECT` / `QUASI` / `NO_MASK`). That second axis is what makes the re-identification question answerable at all, and it is why this corpus and not a general NER one.
@@ -18,7 +18,7 @@ Anchored in the [Text Anonymization Benchmark](https://github.com/NorskRegnesent
 
 1. **Off-the-shelf NER is not close.** spaCy's strongest English model scores **0.566 partial-match F1** on TAB, with **0% recall on case-file numbers** — that label doesn't exist in its vocabulary. The failure is categorical, not marginal.
 2. **Fine-tuning closes the detection gap.** RoBERTa fine-tuned on TAB reaches **0.856 F1, 95% CI [0.848, 0.864]** (+29 pp), and the lift lands exactly where TAB's label set diverges from newswire NER. LegalBERT, despite 12 GB of legal pretraining, is statistically indistinguishable from it.
-3. **It doesn't matter.** Assume a *perfect* detector; mask every direct identifier. **One well-chosen residual fact — a nationality, an occupation, a place — singles out 77% of documents within the corpus; two facts reach 88%.** The identifying information was never only in the names.
+3. **It doesn't matter.** Assume a *perfect* detector; mask every direct identifier. **One well-chosen residual fact singles out 81% of the 1,268 documents; two reach 93%.** Strip the dates and the money and ask only about nationality, occupation and place, and one such detail still singles out **66%** of every document that carries one. The identifying information was never only in the names.
 
    ⚠️ *An earlier version of this README reported "1,268 / 1,268 uniquely identifiable". That figure was an artefact and has been withdrawn — see [the mosaic claim, corrected](#the-mosaic-claim-corrected).*
 
@@ -147,10 +147,13 @@ The right question is not "is the whole fingerprint unique" but **"how many fact
 | Attribute set | n | median facts | 1 fact | 2 facts | 3 facts | never unique |
 |---|---|---|---|---|---|---|
 | All (DEM + DATETIME + LOC + QUANTITY) | 1,268 | 14 | 81.2% | 93.3% | 96.5% | 0.9% |
-| **Person-like only (DEM + LOC)** | **887** | **4** | **76.8%** | **87.5%** | **88.3%** | **11.3%** |
-| Demographics only (DEM) | 378 | 3 | 80.2% | 88.4% | 89.2% | 10.6% |
+| **Person-like only (DEM + LOC), every document carrying one** | **1,187** | **3** | **65.6%** | **74.5%** | **75.1%** | **24.6%** |
+| Person-like only (DEM + LOC), documents carrying ≥ 2 | 887 | 4 | 76.8% | 87.5% | 88.3% | 11.3% |
+| Demographics only (DEM), documents carrying ≥ 2 | 378 | 3 | 80.2% | 88.4% | 89.2% | 10.6% |
 
-Two things make this trustworthy where the old number wasn't. It has a **distribution** — 11% of documents are never unique, even given every fact. And it **survives deleting the dates and the money entirely**: restricting to nationality, ethnicity, occupation and location barely moves it, from 81% to 77% on one fact. The finding was never actually driven by the years; the old metric just made it impossible to tell.
+**Read the denominators before the percentages.** An earlier version of this section compared the 81.2% against the 76.8% and called the difference small — but those rows count different documents. `diagnose_mosaic_claim.py` keeps only documents holding **at least two** facts of the given kind, and restricting to DEM + LOC drops 381 documents out of the denominator: precisely the sparse ones, which are the hardest to single out. Compared on a common denominator the honest figure is **81.2% → 65.6%**, a fifteen-point fall rather than a four-point one. That is the second denominator artefact this analysis has produced, and it is the same mistake in a smaller costume.
+
+What survives is still the finding. Two things make it trustworthy where the old number wasn't. It has a **distribution** — a quarter of documents are never unique on demographics and places alone, even given every fact they have. And it does not depend on the dates: strip DATETIME and QUANTITY entirely and **two thirds of documents are still singled out by one ordinary detail**.
 
 The design consequence is unchanged, which is why the product was built the way it is: **one ordinary residual detail is usually enough, so anonymisation needs a re-identification check and not just entity masking.**
 

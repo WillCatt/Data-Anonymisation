@@ -27,7 +27,6 @@ from anonymisation.data import load_tab
 from anonymisation.mapping import SPACY_TO_TAB
 from anonymisation.evaluation import extract_gold_entities
 from anonymisation.predictors import make_finetuned_predictor, build_presidio_analyzer, make_presidio_predictor
-from anonymisation.device import best_device
 
 LEGALBERT_DIR = REPO / "models/legalbert-tab/final"
 

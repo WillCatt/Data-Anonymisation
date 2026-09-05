@@ -17,7 +17,6 @@ LOC/DEM, an LLM call for free-text MISC fields).
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 # ---------------------------------------------------------------------------
 # DATETIME — extract year, then decade

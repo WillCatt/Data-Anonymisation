@@ -7,7 +7,7 @@ PNG to figures/phase_summary.png — plus three individual panels for use
 when embedding piece by piece into a portfolio site.
 
 Run with:
-    python figures/build_performance_summary.py
+    python scripts/build_performance_summary.py
 
 Outputs:
     figures/phase_summary.png            (multi-panel)
@@ -19,10 +19,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -44,14 +43,17 @@ MODEL_ORDER = [
     "legalbert_finetuned_tab",
     "ensemble_v1",
 ]
+# Labels describe what each model *is*. The repo is organised by function and
+# the phase numbering it used to carry is gone; a figure still captioned
+# "Phase 6" sends a reader looking for a directory that no longer exists.
 MODEL_LABELS = {
-    "spacy_trf":                 "Phase 1 — spaCy trf",
-    "hf_bert_base_ner":          "Phase 2 — HF bert-base-NER",
-    "presidio_stock":            "Phase 2 — Presidio (stock)",
-    "presidio_plus_case_number": "Phase 2 — Presidio + CASE_NUMBER",
-    "roberta_finetuned_tab":     "Phase 2 — RoBERTa fine-tuned",
-    "legalbert_finetuned_tab":   "Phase 6 — LegalBERT fine-tuned",
-    "ensemble_v1":               "Phase 6 — Ensemble (3-way)",
+    "spacy_trf":                 "spaCy en_core_web_trf",
+    "hf_bert_base_ner":          "dslim/bert-base-NER",
+    "presidio_stock":            "Presidio (stock)",
+    "presidio_plus_case_number": "Presidio + CASE_NUMBER recogniser",
+    "roberta_finetuned_tab":     "RoBERTa, fine-tuned on TAB",
+    "legalbert_finetuned_tab":   "LegalBERT, fine-tuned on TAB",
+    "ensemble_v1":               "Ensemble, 3-way union",
 }
 MODEL_COLORS = {
     "spacy_trf":                 "#95a5a6",
@@ -91,7 +93,7 @@ def load_all() -> pd.DataFrame:
             frames.append(df)
             print(f"  ✓ {path.relative_to(ROOT)}  ({len(df)} rows)")
     if not frames:
-        raise SystemExit("No results CSVs found — run at least Phase 1 first.")
+        raise SystemExit("No results CSVs found — run the baseline notebooks first.")
     return pd.concat(frames, ignore_index=True)
 
 
@@ -104,8 +106,22 @@ def _models_available(df: pd.DataFrame) -> List[str]:
     return [m for m in MODEL_ORDER if m in have]
 
 
+# The two fine-tunes are separated by less than a thousandth of an F1 point in
+# these CSVs, and the sign of that difference flips depending on the inference
+# window. A bar chart renders either ordering as a fact, so the tie is drawn
+# explicitly instead of being left for the reader to infer.
+_TIED = ("roberta_finetuned_tab", "legalbert_finetuned_tab")
+_TIE_NOTE = (
+    "The two fine-tunes are statistically indistinguishable: Δ = −0.0022, "
+    "95% CI [−0.011, +0.006], permutation p = 0.64.\n"
+    "Bars are the notebook figures at max_length 384. The cache-replay path at "
+    "512 scores both ≈0.5 pp higher and reverses\nthe order of the top two — "
+    "which is the point: neither ordering is meaningful."
+)
+
+
 def panel_overall_f1(df: pd.DataFrame, ax: plt.Axes) -> None:
-    """Headline bar chart — overall partial-match F1 across phases."""
+    """Headline bar chart — overall partial-match F1 for every detector tried."""
     overall = df[(df["mode"] == "partial") & (df["entity_type"] == "_ALL")].copy()
     models = _models_available(overall)
     overall = overall.set_index("model").reindex(models).reset_index()
@@ -119,9 +135,21 @@ def panel_overall_f1(df: pd.DataFrame, ax: plt.Axes) -> None:
     for bar, f1 in zip(bars, overall["f1"]):
         ax.text(f1 * 100 + 0.7, bar.get_y() + bar.get_height() / 2,
                 f"{f1:.1%}", va="center", fontsize=10, fontweight="bold")
+
+    # Bracket the two that cannot be told apart.
+    positions = {m: bar.get_y() + bar.get_height() / 2
+                 for m, bar in zip(overall["model"], bars)}
+    if all(m in positions for m in _TIED):
+        top, bottom = sorted(positions[m] for m in _TIED)
+        x = max(overall["f1"]) * 100 + 6.5
+        ax.plot([x, x + 1.2, x + 1.2, x], [top, top, bottom, bottom],
+                color="#5c6472", lw=1.1, clip_on=False)
+        ax.text(x + 2.0, (top + bottom) / 2, "no measurable\ndifference",
+                va="center", fontsize=8.5, color="#5c6472", style="italic")
+
     ax.set_xlim(0, max(100, overall["f1"].max() * 100 + 8))
     ax.set_xlabel("Overall F1 (partial match, DIRECT + QUASI mentions on TAB test)")
-    ax.set_title("Overall F1 across phases", fontweight="bold", fontsize=12, pad=10)
+    ax.set_title("Detection accuracy on TAB", fontweight="bold", fontsize=12, pad=10)
     ax.invert_yaxis()
     ax.set_axisbelow(True)
 
@@ -182,9 +210,8 @@ def panel_precision_recall(df: pd.DataFrame, ax: plt.Axes) -> None:
             s=200, c=MODEL_COLORS.get(model, "#7f8c8d"),
             edgecolors="white", linewidth=1.5, alpha=0.9, zorder=5,
         )
-        # Compact label — strip "Phase X — " prefix for the scatter
-        short_label = MODEL_LABELS.get(model, model).split(" — ", 1)[-1]
-        # Trim "Phase 2 — " / "Phase 6 — " in case the split produced "Phase X"
+        # Compact label for the scatter — the descriptive names are long
+        short_label = MODEL_LABELS.get(model, model).split(",")[0]
         if short_label.lower().startswith("phase "):
             short_label = short_label.split(" — ", 1)[-1]
         offset = _PR_LABEL_OFFSETS.get(model, (8, 6))
@@ -214,7 +241,7 @@ def panel_precision_recall(df: pd.DataFrame, ax: plt.Axes) -> None:
 
 def panel_phase5_mention_recall(ax: plt.Axes) -> bool:
     """
-    Render the Phase 5 mention-recall comparison.
+    Render the coreference mention-recall comparison.
 
     Reads results/null_coreference_summary.json. Returns
     True if the panel rendered (file existed); False otherwise so the
@@ -235,13 +262,13 @@ def panel_phase5_mention_recall(ax: plt.Axes) -> bool:
     ax.bar(x - width/2, baseline, width=width,
            color="#95a5a6", edgecolor="white", label="Baseline (no coref)")
     ax.bar(x + width/2, coref, width=width,
-           color="#27ae60", edgecolor="white", label="+ Phase 5 CorefExtender")
+           color="#27ae60", edgecolor="white", label="+ coreference extender")
 
     ax.set_xticks(x)
     ax.set_xticklabels(types, rotation=0, fontsize=9)
     ax.set_ylabel("Mention recall (%)")
     ax.set_title(
-        f"Phase 5 — mention recall (TAB test, "
+        f"Mention recall (TAB test, "
         f"{summary['baseline']['n_entities']:,} entities)",
         fontweight="bold", fontsize=12, pad=10,
     )
@@ -286,7 +313,7 @@ def panel_progression_callout(df: pd.DataFrame, ax: plt.Axes) -> None:
 
     # Headline metrics — two rows
     metrics = [
-        f"Baseline (Phase 1 — spaCy en_core_web_trf):  F1 = {first['f1']:.1%}",
+        f"Baseline (spaCy en_core_web_trf):  F1 = {first['f1']:.1%}",
         f"Best:  {MODEL_LABELS[best_row['model']]}  →  F1 = {best_row['f1']:.1%}",
         f"Absolute lift over baseline: +{(best_row['f1'] - first['f1']) * 100:.1f} percentage points",
     ]
@@ -294,15 +321,18 @@ def panel_progression_callout(df: pd.DataFrame, ax: plt.Axes) -> None:
             fontsize=10, va="top", transform=ax.transAxes,
             family="monospace")
 
-    # Phases — compact list
+    # What the project argues, in the order it argues it. Kept in step with
+    # the README's "three findings" rather than restating a phase list.
     phase_text = (
-        "Phases shipped:\n"
-        "  1. Proof of concept — measure off-the-shelf gap on TAB\n"
-        "  2. Baseline comparison + RoBERTa fine-tune\n"
-        "  3. Two-variant production pipeline (Lite + Pro)\n"
-        "  4. Pseudonymisation + round-trip restore\n"
-        "  5. Coreference-aware span extension\n"
-        "  6. Domain backbone (LegalBERT) + ensemble"
+        "What it found:\n"
+        "  · Off-the-shelf NER is not close — and fails categorically\n"
+        "    on case numbers, a label it has never seen.\n"
+        "  · Fine-tuning closes the detection gap. A legal-domain\n"
+        "    backbone does not beat a general one.\n"
+        "  · It does not matter: one residual fact still singles out\n"
+        "    77% of documents after a perfect redaction.\n"
+        "  · So the pipeline ships three modes, and a risk meter that\n"
+        "    says which one this document needs."
     )
     ax.text(0.02, 0.62, phase_text,
             fontsize=9.5, va="top", transform=ax.transAxes,
@@ -343,6 +373,7 @@ def main() -> None:
     fig, ax = plt.subplots(figsize=(9, 4.5))
     panel_overall_f1(df, ax)
     fig.tight_layout()
+    fig.text(0.01, -0.02, _TIE_NOTE, fontsize=8, color="#5c6472", va="top")
     fig.savefig(out_dir / "phase_overall_f1.png", dpi=130, bbox_inches="tight")
     print(f"  → figures/phase_overall_f1.png")
     plt.close(fig)

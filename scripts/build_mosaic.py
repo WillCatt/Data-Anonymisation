@@ -24,7 +24,7 @@ documents are never unique (their whole fingerprint is a subset of another's) �
 reported rather than hidden.
 
 Run with:
-    legal-anon-env/bin/python figures/build_mosaic.py
+    legal-anon-env/bin/python scripts/build_mosaic.py
 
 Output:
     figures/mosaic_reidentification.png
@@ -35,7 +35,6 @@ first run).
 from __future__ import annotations
 
 import sys
-from collections import Counter
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -58,6 +57,14 @@ sns.set_theme(style="whitegrid", font_scale=0.95)
 # the rest of the project uses (anonymisation.mosaic.quasi_identifier_signature).
 QUASI_TYPES = ("DEM", "DATETIME", "LOC", "QUANTITY")
 
+# The conservative subset: the "ordinary details" the write-up actually claims
+# — a nationality, an occupation, a place. It drops DATETIME and QUANTITY,
+# which is where the original 100% artefact came from (63% of the fingerprint
+# was DATETIME and 85% of those a bare year, which identifies a *case* rather
+# than a person). Both curves are plotted so the two numbers the project
+# quotes — 81% and 77% — appear together instead of in separate documents.
+HEADLINE_TYPES = ("DEM", "LOC")
+
 ACCENT = "#d73a49"   # the project's "mosaic / risk" red — the smart attacker
 MUTED = "#e8a3a3"    # the naive document-order curve
 GREY = "#95a5a6"
@@ -68,7 +75,7 @@ Fact = Tuple[str, str]
 # ---------------------------------------------------------------------------
 # Per document: normalised quasi-identifiers, ordered by first appearance
 # ---------------------------------------------------------------------------
-def ordered_quasi_by_doc(docs) -> Dict[str, List[Fact]]:
+def ordered_quasi_by_doc(docs, types=QUASI_TYPES) -> Dict[str, List[Fact]]:
     """
     For each doc_id, return its normalised QUASI facts as (entity_type, value)
     pairs, deduplicated and ordered by first appearance in the document.
@@ -82,7 +89,7 @@ def ordered_quasi_by_doc(docs) -> Dict[str, List[Fact]]:
         for em in doc["entity_mentions"]:
             if em["identifier_type"] != "QUASI":
                 continue
-            if em["entity_type"] not in QUASI_TYPES:
+            if em["entity_type"] not in types:
                 continue
             value = normalise_quasi_value(em["entity_type"], em["span_text"])
             if not value:
@@ -151,19 +158,29 @@ def _first_crossing(ns: List[int], fracs: List[float], threshold: float) -> Opti
 # ---------------------------------------------------------------------------
 # Panels
 # ---------------------------------------------------------------------------
-def panel_curves(ns, doc_fracs, smart_fracs, n_docs, ax: plt.Axes) -> None:
+def panel_curves(ns, doc_fracs, smart_fracs, headline_fracs, n_docs, ax: plt.Axes) -> None:
     ax.plot(ns, doc_fracs, marker="o", markersize=3.5, color=MUTED, linewidth=1.8,
             label="Facts in document order")
     ax.plot(ns, smart_fracs, marker="o", markersize=4, color=ACCENT, linewidth=2.4,
-            label="Smart attacker (rarest facts first)")
+            label="Rarest facts first — all quasi-identifiers")
     ax.fill_between(ns, smart_fracs, color=ACCENT, alpha=0.07)
+    ax.plot(ns, headline_fracs, marker="o", markersize=3.5, color="#8a6d12",
+            linewidth=2.0, linestyle="--",
+            label="Rarest facts first — demographics and places only")
 
     one = smart_fracs[0]
     ax.annotate(
         f"{one:.0f}% unique\nfrom 1 fact",
-        xy=(1, one), xytext=(2.2, one - 20),
+        xy=(1, one), xytext=(2.4, one - 17),
         fontsize=9, color=ACCENT, fontweight="bold",
         arrowprops=dict(arrowstyle="->", color=ACCENT, linewidth=1),
+    )
+    head_one = headline_fracs[0]
+    ax.annotate(
+        f"{head_one:.0f}% from one\nordinary detail",
+        xy=(1, head_one), xytext=(3.4, head_one - 38),
+        fontsize=9, color="#8a6d12", fontweight="bold",
+        arrowprops=dict(arrowstyle="->", color="#8a6d12", linewidth=1),
     )
     n95 = _first_crossing(ns, doc_fracs, 95)
     if n95 is not None:
@@ -183,7 +200,7 @@ def panel_curves(ns, doc_fracs, smart_fracs, n_docs, ax: plt.Axes) -> None:
         f"(normalised QUASI facts, after a perfect DIRECT redaction · n={n_docs:,} docs)",
         fontweight="bold", fontsize=12, pad=10,
     )
-    ax.legend(loc="lower right", fontsize=9, frameon=True)
+    ax.legend(loc="lower right", fontsize=8.5, frameon=True)
     ax.set_axisbelow(True)
 
 
@@ -231,6 +248,13 @@ def main() -> None:
     ns, doc_fracs = cdf(doc_order, n_docs, max_n)
     _, smart_fracs = cdf(smart, n_docs, max_n)
 
+    # The same attacker restricted to the facts the write-up headlines.
+    headline_by_doc = ordered_quasi_by_doc(docs, HEADLINE_TYPES)
+    _, headline_smart = reidentification_counts(headline_by_doc)
+    _, headline_fracs = cdf(headline_smart, len(headline_by_doc), max_n)
+    print(f"  demographics + places only — unique from 1 fact: {headline_fracs[0]:.1f}%   "
+          f"2 facts: {cdf(headline_smart, len(headline_by_doc), 2)[1][-1]:.1f}%")
+
     never = sum(1 for c in smart if c is None)
     uniq = [c for c in smart if c is not None]
     print(f"  smart attacker — unique from 1 fact: {smart_fracs[0]:.1f}%   "
@@ -241,13 +265,22 @@ def main() -> None:
           f"95% crossing: n={_first_crossing(ns, doc_fracs, 95)}")
 
     fig, (ax_curve, ax_hist) = plt.subplots(1, 2, figsize=(15, 5.5))
-    panel_curves(ns, doc_fracs, smart_fracs, n_docs, ax_curve)
+    panel_curves(ns, doc_fracs, smart_fracs, headline_fracs, n_docs, ax_curve)
     panel_min_facts(smart, n_docs, ax_hist)
     fig.suptitle(
-        "The mosaic effect — a realistic attacker re-identifies almost everything",
+        "The mosaic effect — one or two ordinary facts are usually enough",
         fontsize=15, fontweight="bold", y=1.02,
     )
     fig.tight_layout()
+    fig.text(
+        0.005, -0.03,
+        "An earlier version of this analysis reported 1,268 / 1,268 documents uniquely "
+        "identifiable. That figure was an artefact of requiring a match on the *entire* "
+        "fingerprint —\na median of 14 facts — and has been withdrawn: a control using "
+        "meaningless tokens with the same set sizes also returns 100%. These curves ask "
+        "the honest question instead,\nwhich is how few facts an attacker needs.",
+        fontsize=8.5, color="#586069", va="top",
+    )
 
     out = ROOT / "figures" / "mosaic_reidentification.png"
     fig.savefig(out, dpi=130, bbox_inches="tight")

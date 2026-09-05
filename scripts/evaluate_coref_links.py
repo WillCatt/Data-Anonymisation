@@ -70,7 +70,6 @@ import pandas as pd  # noqa: E402
 from anonymisation.data import load_tab  # noqa: E402
 from anonymisation.pipeline.pseudonymise import (  # noqa: E402
     LINK_CONFIDENCE_PRIOR,
-    NEW_ENTITY,
     Pseudonymiser,
 )
 

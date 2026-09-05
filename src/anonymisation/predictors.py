@@ -166,7 +166,7 @@ def make_finetuned_predictor(
     final span list is deduplicated by (start, end, type).
     """
     import torch
-    from .iob import bio_to_spans, ID_TO_LABEL  # local import — avoids hard dep at module load
+    from .iob import bio_to_spans  # local import — avoids hard dep at module load
 
     model.eval()
     model.to(device)

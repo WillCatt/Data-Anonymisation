@@ -13,7 +13,7 @@ from __future__ import annotations
 from typing import Callable, Iterable, List, Optional, Tuple
 
 from .coref import extend_with_coref
-from .types import AuditEntry, IdentifierRole, RedactionResult, Span
+from .types import RedactionResult, Span
 from .roles import classify_role, RoleOverride
 from .regex_pass import regex_pass, merge_with_ner
 

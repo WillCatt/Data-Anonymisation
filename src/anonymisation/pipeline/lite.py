@@ -29,7 +29,7 @@ from typing import List, Optional
 
 from .base import Pipeline
 from .pseudonymise import Pseudonymiser
-from .types import AuditEntry, RedactionResult, Span
+from .types import AuditEntry, RedactionResult
 
 
 class LitePipeline(Pipeline):

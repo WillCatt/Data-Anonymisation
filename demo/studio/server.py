@@ -36,7 +36,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Tuple
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
@@ -48,7 +48,7 @@ sys.path.insert(0, str(ROOT / "src"))
 STATIC = Path(__file__).resolve().parent / "static"
 
 from anonymisation.mapping import SPACY_TO_TAB                                  # noqa: E402
-from anonymisation.pipeline import (                                            # noqa: E402
+from anonymisation.pipeline import (  # noqa: E402
     LitePipeline, ProPipeline, MosaicScorer, generalize, restore,
 )
 from anonymisation.pipeline.roles import DEFAULT_ROLE_BY_TYPE                   # noqa: E402

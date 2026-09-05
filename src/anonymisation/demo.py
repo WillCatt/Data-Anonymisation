@@ -11,7 +11,6 @@ Gradio / HF Space demo.
 """
 from __future__ import annotations
 
-from typing import Optional
 
 from .mapping import SPACY_TO_TAB
 
