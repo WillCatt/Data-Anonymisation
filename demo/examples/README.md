@@ -25,3 +25,11 @@ that every part of the pipeline has something to do.
 
 The shorter `sample_1` … `sample_4` and the domain pairs (`*_b_*`, `*_c_*`) are
 older, terser fixtures kept for quick checks.
+
+## Local-only samples
+
+Drop any `.txt` in here and the picker finds it on the next request — no
+restart. A sample written for one audience, naming real people or a real
+organisation, belongs in `.gitignore` rather than in a public repository, even
+when its contents are invented. There is at least one such file locally that
+is deliberately not tracked.
