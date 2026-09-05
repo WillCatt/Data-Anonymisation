@@ -71,3 +71,6 @@ INTERVIEW_STORYLINE.md
 # as a local demo, not something to publish under their names.
 demo/examples/sample_long_confidentiality_review.txt
 logs/
+
+# Base-model weights fetched for the Longformer comparison (600 MB, re-downloadable)
+models/longformer-base-4096/

@@ -83,6 +83,10 @@ def main() -> None:
     ap.add_argument("--lrs", type=float, nargs="+", default=[2e-5])
     ap.add_argument("--epochs", type=int, nargs="+", default=[3])
     ap.add_argument("--batch-size", type=int, default=None, help="default: 16 on CUDA, 8 otherwise")
+    ap.add_argument("--grad-accum", type=int, default=1,
+                    help="gradient accumulation steps. A long-window model may only fit a "
+                         "batch of 1, and comparing it against a run at batch 8 would vary "
+                         "two things at once; set this so batch x accum matches.")
     ap.add_argument("--max-length", type=int, default=384)
     ap.add_argument("--stride", type=int, default=64)
     ap.add_argument("--device", default=None, help="default: auto (cuda > mps > cpu)")
@@ -110,13 +114,21 @@ def main() -> None:
     short_name = args.base_model.split("/")[-1]
 
     print(f"Base model : {args.base_model}")
-    print(f"Device     : {device}   batch: {batch_size}   window: {args.max_length}/{args.stride}")
+    effective = batch_size * args.grad_accum
+    print(f"Device     : {device}   batch: {batch_size}"
+          f"{f' x {args.grad_accum} accum = {effective}' if args.grad_accum > 1 else ''}"
+          f"   window: {args.max_length}/{args.stride}")
     print(f"Grid       : seeds={args.seeds}  lrs={args.lrs}  epochs={args.epochs}\n")
 
     dataset = load_tab()
     # RoBERTa is byte-BPE and needs add_prefix_space for word-aligned tokens;
-    # BERT-family WordPiece tokenizers reject the argument.
-    tok_kwargs = {"add_prefix_space": True} if "roberta" in args.base_model.lower() else {}
+    # BERT-family WordPiece tokenizers reject the argument. Longformer is a
+    # RoBERTa tokenizer under a different name, so it belongs on this side of
+    # the fence — without it its tokenisation would differ from the RoBERTa run
+    # it is being compared against, for no reason anyone intended.
+    _byte_bpe = ("roberta", "longformer")
+    tok_kwargs = ({"add_prefix_space": True}
+                  if any(k in args.base_model.lower() for k in _byte_bpe) else {})
     tokenizer = AutoTokenizer.from_pretrained(args.base_model, **tok_kwargs)
 
     def tokenise_and_align(doc):
@@ -170,6 +182,7 @@ def main() -> None:
                 targs = TrainingArguments(
                     output_dir=str(tmp), num_train_epochs=epochs, learning_rate=lr,
                     per_device_train_batch_size=batch_size, per_device_eval_batch_size=batch_size,
+                    gradient_accumulation_steps=args.grad_accum,
                     weight_decay=0.01, eval_strategy="epoch", save_strategy="epoch",
                     logging_steps=50, load_best_model_at_end=True, metric_for_best_model="loss",
                     save_total_limit=1, seed=seed, report_to="none", fp16=(device == "cuda"),
@@ -189,7 +202,8 @@ def main() -> None:
                     max_length=args.max_length, stride=args.stride,
                 )
                 row = {"base_model": args.base_model, "seed": seed, "lr": lr, "epochs": epochs,
-                       "batch_size": batch_size, "max_length": args.max_length, "stride": args.stride,
+                       "batch_size": batch_size, "grad_accum": args.grad_accum,
+                       "max_length": args.max_length, "stride": args.stride,
                        "n_train_docs": n_train_docs, "n_train_chunks": len(train_ds),
                        "train_minutes": round(train_mins, 1)}
                 for split in ("validation", "test"):

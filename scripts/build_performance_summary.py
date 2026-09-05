@@ -41,6 +41,7 @@ MODEL_ORDER = [
     "presidio_plus_case_number",
     "roberta_finetuned_tab",
     "legalbert_finetuned_tab",
+    "longformer_finetuned_tab",
     "ensemble_v1",
 ]
 # Labels describe what each model *is*. The repo is organised by function and
@@ -53,6 +54,7 @@ MODEL_LABELS = {
     "presidio_plus_case_number": "Presidio + CASE_NUMBER recogniser",
     "roberta_finetuned_tab":     "RoBERTa, fine-tuned on TAB",
     "legalbert_finetuned_tab":   "LegalBERT, fine-tuned on TAB",
+    "longformer_finetuned_tab":  "Longformer 4096, fine-tuned on TAB",
     "ensemble_v1":               "Ensemble, 3-way union",
 }
 MODEL_COLORS = {
@@ -62,6 +64,7 @@ MODEL_COLORS = {
     "presidio_plus_case_number": "#8e44ad",
     "roberta_finetuned_tab":     "#27ae60",
     "legalbert_finetuned_tab":   "#16a085",
+    "longformer_finetuned_tab":  "#1f7a8c",
     "ensemble_v1":               "#e74c3c",
 }
 
@@ -83,6 +86,7 @@ def load_all() -> pd.DataFrame:
         (ROOT / "results" / "baseline_presidio.csv",   None),
         (ROOT / "results" / "finetune_roberta.csv",  None),
         (ROOT / "results" / "finetune_legalbert.csv",    None),
+        (ROOT / "results" / "finetune_longformer.csv",   None),
         (ROOT / "results" / "null_ensemble.csv",     None),
     ]
     frames: List[pd.DataFrame] = []
@@ -111,6 +115,7 @@ def _models_available(df: pd.DataFrame) -> List[str]:
 # window. A bar chart renders either ordering as a fact, so the tie is drawn
 # explicitly instead of being left for the reader to infer.
 _TIED = ("roberta_finetuned_tab", "legalbert_finetuned_tab")
+_LONGFORMER = "longformer_finetuned_tab"
 _TIE_NOTE = (
     "The two fine-tunes are statistically indistinguishable: Δ = −0.0022, "
     "95% CI [−0.011, +0.006], permutation p = 0.64.\n"
