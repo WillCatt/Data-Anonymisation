@@ -78,6 +78,7 @@ The table reports the **fine-tune notebooks'** runs (inference `max_length=384`)
 | Presidio + CASE_NUMBER | 0.6031 | 0.4249 | regex fixes CODE; ORG noise dominates |
 | **RoBERTa fine-tuned** | **0.8510** | **0.7842** | best point estimate — but see the paired test below |
 | LegalBERT fine-tuned | 0.8486 | 0.7847 | tie — see null #2 |
+| Longformer 4096 fine-tuned | *see null #4* | | reads whole documents; no measurable gain |
 | Ensemble, union (min 1) | 0.5530 | 0.4793 | backfired — see null #3 |
 | Ensemble, consensus (min 3) | 0.7949 | 0.7220 | recovers, still loses |
 | Routed (per-label best) | 0.8538 | 0.7902 | collapses to a single model |
@@ -107,7 +108,7 @@ Reproduce: `python scripts/bootstrap_ci.py --mode both` → [`results/bootstrap_
 
 ## What didn't work
 
-Three measured nulls, kept in the repo on purpose.
+Four measured nulls, kept in the repo on purpose.
 
 **1 · Coreference extension moved recall by 0.0001.** The hypothesis was that NER under-recalls shorthand mentions ("Maria" after "Maria Petrova"). Macro recall went 0.8399 → 0.8400. spaCy is already at ≥95% recall on PERSON and ORG, so there was nothing for the rule to find; the categories that *do* under-recall (DEM, MISC, CODE) are exactly the ones a substring rule can't help. Kept as a zero-cost defensive layer, kept out of the headline.
 
@@ -116,6 +117,12 @@ Three measured nulls, kept in the repo on purpose.
 **3 · The three-way ensemble scored worse than its own baseline.** Union voting over spaCy + LegalBERT + Presidio gave 0.553, against 0.851 for either fine-tune alone. The mechanism is clean: Presidio's ORG precision is 0.14, and under `min_votes=1` every one of its false positives lands in the output even when both fine-tunes correctly rejected it. **The ensemble inherited its worst member.** Fixing the vote rule confirms the diagnosis — consensus recovers to 0.795 — but no combiner beats the single fine-tune, because it is Pareto-dominant across all eight labels, so per-label routing collapses to it alone.
 
 → [`figures/ensemble_backfire.png`](figures/ensemble_backfire.png) · [`docs/notes/advanced-training.md`](docs/notes/advanced-training.md)
+
+**4 · Removing the sliding window bought nothing measurable.** TAB's median document is 1,164 tokens and **96% of the corpus exceeds RoBERTa's 512-token limit**, so every document is read as roughly five overlapping fragments — which is what makes the de-duplication mismatch above cost real accuracy. Longformer takes 4,096 tokens in one pass, fits 93% of the corpus whole, and is the architecture the TAB paper used. At RoBERTa's exact recipe, three seeds each: **0.8436 ± 0.0048 against 0.8380 ± 0.0097, a difference of +0.58 sd with the seed ranges overlapping.** Not distinguishable, by the standard the seed sweep established.
+
+The interesting part is why the comparison is harder to make than it looks. One document is one chunk at a 4,096-token window and about five at 384, so a matched *epoch* count is not a matched *budget*: **Longformer gets 447 optimiser steps where RoBERTa gets 2,379.** Every configuration giving it less training scored worse — two epochs below three, a lower learning rate worse still — which points at the step count rather than the architecture as the binding constraint. So the honest claim is "no measurable gain at RoBERTa's recipe", not "no gain"; a step-matched comparison is roughly eight hours a run and has not been done.
+
+→ [`notebooks/16_ablations.ipynb`](notebooks/16_ablations.ipynb) — Ablation 4
 
 ---
 
