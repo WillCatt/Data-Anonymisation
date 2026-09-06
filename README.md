@@ -78,7 +78,7 @@ The table reports the **fine-tune notebooks'** runs (inference `max_length=384`)
 | Presidio + CASE_NUMBER | 0.6031 | 0.4249 | regex fixes CODE; ORG noise dominates |
 | **RoBERTa fine-tuned** | **0.8510** | **0.7842** | best point estimate — but see the paired test below |
 | LegalBERT fine-tuned | 0.8486 | 0.7847 | tie — see null #2 |
-| Longformer 4096 fine-tuned | *see null #4* | | reads whole documents; no measurable gain |
+| Longformer 4096 fine-tuned | 0.8579 | | at **its own** best lr (3e-5); ties RoBERTa at RoBERTa's — see null #4 |
 | Ensemble, union (min 1) | 0.5530 | 0.4793 | backfired — see null #3 |
 | Ensemble, consensus (min 3) | 0.7949 | 0.7220 | recovers, still loses |
 | Routed (per-label best) | 0.8538 | 0.7902 | collapses to a single model |
@@ -118,9 +118,21 @@ Four measured nulls, kept in the repo on purpose.
 
 → [`figures/ensemble_backfire.png`](figures/ensemble_backfire.png) · [`docs/notes/advanced-training.md`](docs/notes/advanced-training.md)
 
-**4 · Removing the sliding window bought nothing measurable.** TAB's median document is 1,164 tokens and **96% of the corpus exceeds RoBERTa's 512-token limit**, so every document is read as roughly five overlapping fragments — which is what makes the de-duplication mismatch above cost real accuracy. Longformer takes 4,096 tokens in one pass, fits 93% of the corpus whole, and is the architecture the TAB paper used. At RoBERTa's exact recipe, three seeds each: **0.8436 ± 0.0048 against 0.8380 ± 0.0097, a difference of +0.58 sd with the seed ranges overlapping.** Not distinguishable, by the standard the seed sweep established.
+**4 · Removing the sliding window bought nothing — until the recipe was allowed to change.** TAB's median document is 1,164 tokens and **96% of the corpus exceeds RoBERTa's 512-token limit**, so every document is read as roughly five overlapping fragments. Longformer takes 4,096 tokens in one pass, fits 93% of the corpus whole, and is the architecture the TAB paper used. At RoBERTa's exact recipe, three seeds each: **0.8436 ± 0.0048 against 0.8380 ± 0.0097 — +0.58 sd, ranges overlapping, not distinguishable.**
 
-The interesting part is why the comparison is harder to make than it looks. One document is one chunk at a 4,096-token window and about five at 384, so a matched *epoch* count is not a matched *budget*: **Longformer gets 447 optimiser steps where RoBERTa gets 2,379.** Every configuration giving it less training scored worse — two epochs below three, a lower learning rate worse still — which points at the step count rather than the architecture as the binding constraint. So the honest claim is "no measurable gain at RoBERTa's recipe", not "no gain"; a step-matched comparison is roughly eight hours a run and has not been done.
+That looked like a clean null. It was an artefact of holding the hyperparameters fixed.
+
+One document is one chunk at 4,096 tokens and about five at 384, so a matched *epoch* count is not a matched *budget*: **Longformer gets 447 optimiser steps where RoBERTa gets 2,379.** Sweeping the learning rate shows the two models sitting on opposite sides of it —
+
+| lr | roberta-base | longformer-4096 |
+|---|---|---|
+| 1e-5 | **0.8447** | 0.8142 |
+| 2e-5 | 0.8380 | 0.8436 |
+| 3e-5 | 0.8262 | **0.8579** |
+
+— which is what the step count predicts: fewer updates need a larger step. At lr 3e-5 Longformer scores **0.8579 over two seeds (sd 0.0013), and both beat RoBERTa's best of five.** Each model at its own best validated configuration puts the gap at **+0.0094, about one standard deviation** — suggestive, not established, on two seeds against four.
+
+**The finding is methodological, not architectural: holding hyperparameters fixed across architectures is not fairness.** A shared learning rate silently favours whichever model it suits. The control has to be the tuning budget, not the tuned values — which costs a sweep per architecture rather than a run.
 
 → [`notebooks/16_ablations.ipynb`](notebooks/16_ablations.ipynb) — Ablation 4
 
