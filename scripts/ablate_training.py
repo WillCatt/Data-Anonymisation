@@ -67,8 +67,7 @@ warnings.filterwarnings("ignore")
 import numpy as np
 import pandas as pd
 
-OUT_CSV = REPO / "results/ablation_training.csv"
-COUNTS_PATH = REPO / "results/ablation_training_counts.json"
+DEFAULT_OUT = REPO / "results/ablation_training.csv"
 
 
 def micro_f1(tp, fp, fn) -> float:
@@ -91,6 +90,14 @@ def main() -> None:
     ap.add_argument("--stride", type=int, default=64)
     ap.add_argument("--device", default=None, help="default: auto (cuda > mps > cpu)")
     ap.add_argument("--keep-checkpoints", action="store_true")
+    ap.add_argument("--gradient-checkpointing", action="store_true",
+                    help="recompute activations in the backward pass instead of storing "
+                         "them. Roughly 30%% slower per step and a large cut in memory — "
+                         "the difference between training and swapping for a 4096-token "
+                         "window on a 24 GB box.")
+    ap.add_argument("--out", type=Path, default=DEFAULT_OUT,
+                    help="results CSV to append to. Point a smoke run somewhere else — "
+                         "a 30-document trial row in the real file looks like a result.")
     ap.add_argument("--limit-train", type=int, default=None,
                     help="train on only the first N docs — also the learning-curve axis")
     ap.add_argument("--limit-eval", type=int, default=None, help="fewer eval docs (smoke test)")
@@ -98,6 +105,9 @@ def main() -> None:
 
     import torch
     from datasets import Dataset
+    OUT_CSV = args.out
+    COUNTS_PATH = args.out.with_name(args.out.stem + "_counts.json")
+
     from transformers import (
         AutoModelForTokenClassification, AutoTokenizer,
         DataCollatorForTokenClassification, Trainer, TrainingArguments, set_seed,
@@ -178,7 +188,14 @@ def main() -> None:
                     args.base_model, num_labels=len(BIO_LABELS),
                     id2label=ID_TO_LABEL, label2id=LABEL_TO_ID,
                 )
-                tmp = Path(tempfile.mkdtemp(prefix=f"abl_{short_name}_{seed}_"))
+                # --keep-checkpoints puts them somewhere durable and findable.
+                # A kept checkpoint in /tmp is one reboot away from being gone,
+                # and retraining to get it back is a different model.
+                if args.keep_checkpoints:
+                    tmp = REPO / "models" / f"{short_name}-tab" / f"seed{seed}_lr{lr:g}_ep{epochs}"
+                    tmp.mkdir(parents=True, exist_ok=True)
+                else:
+                    tmp = Path(tempfile.mkdtemp(prefix=f"abl_{short_name}_{seed}_"))
                 targs = TrainingArguments(
                     output_dir=str(tmp), num_train_epochs=epochs, learning_rate=lr,
                     per_device_train_batch_size=batch_size, per_device_eval_batch_size=batch_size,
@@ -186,6 +203,7 @@ def main() -> None:
                     weight_decay=0.01, eval_strategy="epoch", save_strategy="epoch",
                     logging_steps=50, load_best_model_at_end=True, metric_for_best_model="loss",
                     save_total_limit=1, seed=seed, report_to="none", fp16=(device == "cuda"),
+                    gradient_checkpointing=args.gradient_checkpointing,
                 )
                 trainer = Trainer(
                     model=model, args=targs, train_dataset=train_ds, eval_dataset=val_ds,
@@ -203,6 +221,7 @@ def main() -> None:
                 )
                 row = {"base_model": args.base_model, "seed": seed, "lr": lr, "epochs": epochs,
                        "batch_size": batch_size, "grad_accum": args.grad_accum,
+                       "grad_checkpointing": args.gradient_checkpointing,
                        "max_length": args.max_length, "stride": args.stride,
                        "n_train_docs": n_train_docs, "n_train_chunks": len(train_ds),
                        "train_minutes": round(train_mins, 1)}
@@ -247,7 +266,11 @@ def main() -> None:
                 if s.max() - s.min() > 0.0022:
                     print("  >> Seed spread EXCEEDS the backbone gap. The backbone comparison")
                     print("     was inside the noise of the training procedure itself.")
-        print(f"\n→ {OUT_CSV.relative_to(REPO)}")
+    try:
+        shown = OUT_CSV.relative_to(REPO)
+    except ValueError:      # --out can point outside the repo, e.g. a smoke run
+        shown = OUT_CSV
+    print(f"\n→ {shown}")
 
 
 if __name__ == "__main__":
