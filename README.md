@@ -78,7 +78,7 @@ The table reports the **fine-tune notebooks'** runs (inference `max_length=384`)
 | Presidio + CASE_NUMBER | 0.6031 | 0.4249 | regex fixes CODE; ORG noise dominates |
 | **RoBERTa fine-tuned** | **0.8510** | **0.7842** | best point estimate — but see the paired test below |
 | LegalBERT fine-tuned | 0.8486 | 0.7847 | tie — see null #2 |
-| Longformer 4096 fine-tuned | 0.8579 | | at **its own** best lr (3e-5); ties RoBERTa at RoBERTa's — see null #4 |
+| Longformer 4096 fine-tuned | 0.8500 | 0.7488 | scored checkpoint, its own best lr (3e-5), `max_length=4096`; **ties on partial, loses on exact** — see null #4 |
 | Ensemble, union (min 1) | 0.5530 | 0.4793 | backfired — see null #3 |
 | Ensemble, consensus (min 3) | 0.7949 | 0.7220 | recovers, still loses |
 | Routed (per-label best) | 0.8538 | 0.7902 | collapses to a single model |
@@ -128,9 +128,15 @@ One document is one chunk at 4,096 tokens and about five at 384, so a matched *e
 |---|---|---|
 | 1e-5 | **0.8447** | 0.8142 |
 | 2e-5 | 0.8380 | 0.8436 |
-| 3e-5 | 0.8262 | **0.8579** |
+| 3e-5 | 0.8262 | **0.8553** |
 
-— which is what the step count predicts: fewer updates need a larger step. At lr 3e-5 Longformer scores **0.8579 over two seeds (sd 0.0013), and both beat RoBERTa's best of five.** Each model at its own best validated configuration puts the gap at **+0.0094, about one standard deviation** — suggestive, not established, on two seeds against four.
+— which is what the step count predicts: fewer updates need a larger step. At lr 3e-5 Longformer scores **0.8553 over three seeds (sd 0.0047), and two of the three beat RoBERTa's best of five.** Each model at its own best validated configuration puts the gap at **+0.0068, about 0.7 of a standard deviation** — suggestive, not established, on three seeds against four.
+
+That third seed is itself part of the lesson. On two seeds this configuration looked like the tightest in the sweep (sd 0.0013); the third came in at 0.8500 and widened it to 0.0047, trimming the gap from +0.0094 to +0.0068. The ranking did not change and the opposite-direction learning-rate signature did not move — but the margin shrank the moment it was asked to replicate, which is the same result this section is about.
+
+**One thing the scored checkpoint adds that the sweep could not.** The sweep only ever reported partial-match F1 from the training harness. Scoring the winning checkpoint end-to-end gives both modes, and they disagree: **partial 0.8500 against RoBERTa's 0.8510 — level — but exact 0.7488 against 0.7842, a 3.5 pp deficit.** Longformer finds the same entities and puts the boundaries in worse places. It is concentrated, not diffuse: CODE −0.138, LOC −0.051, ORG −0.045 on exact, while DATETIME and QUANTITY are level or better. That is far larger than the 0.0047 seed spread, so unlike the partial-match gap it is not plausibly noise — and it runs opposite to the partial-match story, which is why it is worth stating separately rather than folding into one headline number.
+
+Note the checkpoint scored here is seed 45, the *weakest* of the three at this configuration (0.8500 against 0.8588 and 0.8570). It was kept because it was the run that produced a checkpoint, not because it was the best — so the partial-match tie is if anything a floor.
 
 **The finding is methodological, not architectural: holding hyperparameters fixed across architectures is not fairness.** A shared learning rate silently favours whichever model it suits. The control has to be the tuning budget, not the tuned values — which costs a sweep per architecture rather than a run.
 
